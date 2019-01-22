@@ -16,24 +16,26 @@
 #include <limits>
 #include <cmath>
 #include <algorithm>
-
-struct QueueFamilyIndices
-{
-	std::optional<uint32_t> GraphicsFamily;
-	std::optional<uint32_t> PresentFamily;
-
-	bool IsComplete() const;
-};
-
-struct SwapChainSupportDetails
-{
-	VkSurfaceCapabilitiesKHR Capabilities;
-	std::vector<VkSurfaceFormatKHR> Formats;
-	std::vector<VkPresentModeKHR> PresentModes;
-};
+#include <fstream>
 
 class App
 {
+protected:
+	struct QueueFamilyIndices
+	{
+		std::optional<uint32_t> GraphicsFamily;
+		std::optional<uint32_t> PresentFamily;
+
+		bool IsComplete() const;
+	};
+
+	struct SwapChainSupportDetails
+	{
+		VkSurfaceCapabilitiesKHR Capabilities;
+		std::vector<VkSurfaceFormatKHR> Formats;
+		std::vector<VkPresentModeKHR> PresentModes;
+	};
+
 public:
 	void Run();
 
@@ -66,13 +68,20 @@ protected:
 
 	/** Step 6 */
 	void CreateSwapChain();
-	/** Helpe */SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice Device, VkSurfaceKHR Surface) const;
-	/** Helpe */VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> & AvailableFormats) const;
-	/** Helpe */VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> & AvailablePresentModes) const;
-	/** Helpe */VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR & Capabilities) const;
+	/** Helper */SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice Device, VkSurfaceKHR Surface) const;
+	/** Helper */VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> & AvailableFormats) const;
+	/** Helper */VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> & AvailablePresentModes) const;
+	/** Helper */VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR & Capabilities) const;
 	
 	/** Step 7 */
 	void CreateSwapChainImageViews();
+
+	/** Step 8 */
+	void CreateRenderPass();
+
+	/** Step 9 */
+	void CreateGraphicsPipeline();
+	/** Helper */VkShaderModule CreateShaderModule(VkDevice Device, const std::vector<char> & ShaderCode);
 
 protected:
 	/** Callback */static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
@@ -94,6 +103,8 @@ protected:
 		VkDebugUtilsMessengerEXT DebugMessenger,
 		const VkAllocationCallbacks * pAllocator
 	);
+
+	/** Helper */static std::vector<char> ReadFile(const std::string & Filename);
 
 protected:
 	GLFWwindow * m_pWindow = nullptr;
@@ -136,4 +147,8 @@ protected:
 	std::vector<VkImageView> m_SwapChainImageViews;
 	VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
 	VkExtent2D m_SwapChainExtent = { 0, 0 };
+
+	VkRenderPass m_RenderPass;
+	VkPipelineLayout m_PipelineLayout;
+	VkPipeline m_GraphicsPipeline;
 };
