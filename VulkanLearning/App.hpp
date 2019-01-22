@@ -43,6 +43,7 @@ protected:
 	void InitWindow();
 	void InitVulkan();
 	void MainLoop();
+	void Draw();
 	void Destroy();
 
 protected:
@@ -91,6 +92,9 @@ protected:
 
 	/** Step 12 */
 	void CreateCommandBuffers();
+
+	/** Step 13 */
+	void CreateSemaphores();
 
 protected:
 	/** Callback */static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
@@ -165,4 +169,7 @@ protected:
 
 	VkCommandPool m_CommandPool;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
+
+	VkSemaphore m_ImageAvailableSemaphore;
+	VkSemaphore m_RenderFinishedSemaphore;
 };
