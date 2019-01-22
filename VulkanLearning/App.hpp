@@ -65,10 +65,10 @@ protected:
 	/** Helper */bool IsPhysicalDeviceSuitable(VkPhysicalDevice Device, VkSurfaceKHR Surface) const;
 	/** Helper */QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice Device) const;
 	/** Helper */bool CheckPhysicalDeviceExtensionsSupport(VkPhysicalDevice Device) const;
+	/** Helper */SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice Device, VkSurfaceKHR Surface) const;
 
 	/** Step 6 */
 	void CreateSwapChain();
-	/** Helper */SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice Device, VkSurfaceKHR Surface) const;
 	/** Helper */VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> & AvailableFormats) const;
 	/** Helper */VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> & AvailablePresentModes) const;
 	/** Helper */VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR & Capabilities) const;
@@ -82,6 +82,9 @@ protected:
 	/** Step 9 */
 	void CreateGraphicsPipeline();
 	/** Helper */VkShaderModule CreateShaderModule(VkDevice Device, const std::vector<char> & ShaderCode);
+
+	/** Step 10 */
+	void CreateFramebuffers();
 
 protected:
 	/** Callback */static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
@@ -151,4 +154,6 @@ protected:
 	VkRenderPass m_RenderPass;
 	VkPipelineLayout m_PipelineLayout;
 	VkPipeline m_GraphicsPipeline;
+
+	std::vector<VkFramebuffer> m_SwapChainFramebuffers;
 };

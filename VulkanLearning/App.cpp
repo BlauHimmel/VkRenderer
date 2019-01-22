@@ -54,6 +54,11 @@ void App::MainLoop()
 
 void App::Destroy()
 {
+	for (auto & Framebuffer : m_SwapChainFramebuffers)
+	{
+		vkDestroyFramebuffer(m_Device, Framebuffer, nullptr);
+	}
+
 	vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
 
 	vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
@@ -330,6 +335,30 @@ void App::CreateLogicalDevice()
 	return RequiredExtensions.empty();
 }
 
+/** Helper */App::SwapChainSupportDetails App::QuerySwapChainSupport(VkPhysicalDevice Device, VkSurfaceKHR Surface) const
+{
+	SwapChainSupportDetails Details;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device, Surface, &Details.Capabilities);
+
+	uint32_t FormatCount = 0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(Device, Surface, &FormatCount, nullptr);
+	if (FormatCount != 0)
+	{
+		Details.Formats.resize(FormatCount);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(Device, Surface, &FormatCount, Details.Formats.data());
+	}
+
+	uint32_t PresentModeCount;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(Device, Surface, &PresentModeCount, nullptr);
+	if (PresentModeCount != 0)
+	{
+		Details.PresentModes.resize(PresentModeCount);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(Device, Surface, &PresentModeCount, Details.PresentModes.data());
+	}
+
+	return Details;
+}
+
 void App::CreateSwapChain()
 {
 	SwapChainSupportDetails SwapChainSupport = QuerySwapChainSupport(m_PhysicalDevice, m_Surface);
@@ -386,30 +415,6 @@ void App::CreateSwapChain()
 
 	m_SwapChainImageFormat = SurfaceFormat.format;
 	m_SwapChainExtent = Extent;
-}
-
-/** Helper */App::SwapChainSupportDetails App::QuerySwapChainSupport(VkPhysicalDevice Device, VkSurfaceKHR Surface) const
-{
-	SwapChainSupportDetails Details;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device, Surface, &Details.Capabilities);
-
-	uint32_t FormatCount = 0;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(Device, Surface, &FormatCount, nullptr);
-	if (FormatCount != 0)
-	{
-		Details.Formats.resize(FormatCount);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(Device, Surface, &FormatCount, Details.Formats.data());
-	}
-
-	uint32_t PresentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(Device, Surface, &PresentModeCount, nullptr);
-	if (PresentModeCount != 0)
-	{
-		Details.PresentModes.resize(PresentModeCount);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(Device, Surface, &PresentModeCount, Details.PresentModes.data());
-	}
-
-	return Details;
 }
 
 /** Helper */VkSurfaceFormatKHR App::ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& AvailableFormats) const
@@ -686,6 +691,30 @@ void App::CreateGraphicsPipeline()
 		throw std::runtime_error("Failed to create shader module!");
 	}
 	return ShaderModule;
+}
+
+void App::CreateFramebuffers()
+{
+	m_SwapChainFramebuffers.resize(m_SwapChainImageViews.size());
+
+	for (size_t i = 0; i < m_SwapChainImageViews.size(); i++)
+	{
+		VkImageView Attachment[] = { m_SwapChainImageViews[i] };
+
+		VkFramebufferCreateInfo CreateInfo = {};
+		CreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		CreateInfo.renderPass = m_RenderPass;
+		CreateInfo.attachmentCount = 1;
+		CreateInfo.pAttachments = Attachment;
+		CreateInfo.width = m_SwapChainExtent.width;
+		CreateInfo.height = m_SwapChainExtent.height;
+		CreateInfo.layers = 1;
+
+		if (vkCreateFramebuffer(m_Device, &CreateInfo, nullptr, &m_SwapChainFramebuffers[i]) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create framebuffer!");
+		}
+	}
 }
 
 /** Callback */VKAPI_ATTR VkBool32 VKAPI_CALL App::DebugCallback(
