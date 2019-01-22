@@ -86,6 +86,12 @@ protected:
 	/** Step 10 */
 	void CreateFramebuffers();
 
+	/** Step 11 */
+	void CreateCommandPool();
+
+	/** Step 12 */
+	void CreateCommandBuffers();
+
 protected:
 	/** Callback */static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
@@ -156,4 +162,7 @@ protected:
 	VkPipeline m_GraphicsPipeline;
 
 	std::vector<VkFramebuffer> m_SwapChainFramebuffers;
+
+	VkCommandPool m_CommandPool;
+	std::vector<VkCommandBuffer> m_CommandBuffers;
 };
