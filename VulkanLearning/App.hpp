@@ -94,7 +94,7 @@ protected:
 	void CreateCommandBuffers();
 
 	/** Step 13 */
-	void CreateSemaphores();
+	void CreateSyncObjects();
 
 protected:
 	/** Callback */static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
@@ -170,6 +170,10 @@ protected:
 	VkCommandPool m_CommandPool;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 
-	VkSemaphore m_ImageAvailableSemaphore;
-	VkSemaphore m_RenderFinishedSemaphore;
+	const int m_MaxFramesInFlights = 2;
+	std::vector<VkSemaphore> m_ImageAvailableSemaphores;
+	std::vector<VkSemaphore> m_RenderFinishedSemaphores;
+	std::vector<VkFence> m_InFlightFences;
+	size_t m_CurrentFrame = 0;
+
 };
