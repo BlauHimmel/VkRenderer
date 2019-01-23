@@ -16,6 +16,7 @@
 #include <set>
 #include <limits>
 #include <cmath>
+#include <ctime>
 #include <algorithm>
 #include <fstream>
 #include <array>
@@ -161,6 +162,7 @@ protected:
 	std::string m_AppName = "VulkanApp";
 	std::string m_EngineName = "VulkanEngine";
 	bool m_bFramebufferResized = false;
+	double m_FPS = 0.0f;
 
 protected:
 #ifdef NDEBUG

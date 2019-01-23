@@ -58,10 +58,29 @@ void App::InitVulkan()
 
 void App::MainLoop()
 {
+	static uint64_t Frame = 0;
+	static clock_t PrevClock = clock();
+	static clock_t CurrClock = clock();
+	static double DeltaTime = 0.0f;
+
 	while (!glfwWindowShouldClose(m_pWindow))
 	{
 		glfwPollEvents();
 		Draw();
+
+		Frame++;
+		CurrClock = clock();
+		DeltaTime = static_cast<double>(CurrClock - PrevClock) / static_cast<double>(CLOCKS_PER_SEC);
+		if (DeltaTime >= 1.0f)
+		{
+			m_FPS = static_cast<double>(Frame) / DeltaTime;
+			PrevClock = CurrClock;
+			Frame = 0;
+
+			char Buffer[256];
+			sprintf_s(Buffer, "%s Fps: %lf", m_Title.c_str(), m_FPS);
+			glfwSetWindowTitle(m_pWindow, Buffer);
+		}
 	}
 
 	vkDeviceWaitIdle(m_Device);
