@@ -2,6 +2,7 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
 #include <cstdint>
 #include <string>
@@ -17,6 +18,7 @@
 #include <cmath>
 #include <algorithm>
 #include <fstream>
+#include <array>
 
 class App
 {
@@ -97,9 +99,29 @@ protected:
 	void CreateCommandPool();
 
 	/** Step 12 */
-	void CreateCommandBuffers();
+	void CreateVertexBuffer();
+	/** Helper */uint32_t FindMemoryType(uint32_t TypeFilter, VkMemoryPropertyFlags Properties);
+	/** Helper */void CreateBuffer(
+		VkDevice Device, 
+		VkDeviceSize Size, 
+		VkBufferUsageFlags Usage, 
+		VkMemoryPropertyFlags Properties, 
+		VkBuffer & Buffer, 
+		VkDeviceMemory & BufferMemory
+	);
+	/** Helper */void CopyBuffer(
+		VkDevice Device, 
+		VkCommandPool CommandPool,
+		VkQueue Queue,
+		VkBuffer SrcBuffer, 
+		VkBuffer DstBuffer, 
+		VkDeviceSize Size
+	);
 
 	/** Step 13 */
+	void CreateCommandBuffers();
+
+	/** Step 14 */
 	void CreateSyncObjects();
 
 protected:
@@ -174,13 +196,13 @@ protected:
 	VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
 	VkExtent2D m_SwapChainExtent = { 0, 0 };
 
-	VkRenderPass m_RenderPass;
-	VkPipelineLayout m_PipelineLayout;
-	VkPipeline m_GraphicsPipeline;
+	VkRenderPass m_RenderPass = VK_NULL_HANDLE;
+	VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
+	VkPipeline m_GraphicsPipeline = VK_NULL_HANDLE;
 
 	std::vector<VkFramebuffer> m_SwapChainFramebuffers;
 
-	VkCommandPool m_CommandPool;
+	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 
 	const int m_MaxFramesInFlights = 2;
@@ -189,4 +211,23 @@ protected:
 	std::vector<VkFence> m_InFlightFences;
 	size_t m_CurrentFrame = 0;
 
+protected:
+	struct Vertex
+	{
+		glm::vec2 Position;
+		glm::vec3 Color;
+
+		static VkVertexInputBindingDescription GetBindingDescription();
+		static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescription();
+	};
+
+	const std::vector<Vertex> m_Vertices = 
+	{
+		{ {  0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
+		{ {  0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+		{ { -0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } }
+	};
+
+	VkBuffer m_VertexBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory m_VertexBufferMemory = VK_NULL_HANDLE;
 };
