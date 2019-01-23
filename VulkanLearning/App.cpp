@@ -18,9 +18,11 @@ void App::InitWindow()
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	m_pWindow = glfwCreateWindow(m_Width, m_Height, m_Title.c_str(), nullptr, nullptr);
+	m_pWindow = glfwCreateWindow(m_InitWidth, m_InitHeight, m_Title.c_str(), nullptr, nullptr);
+
+	glfwSetWindowUserPointer(m_pWindow, this);
+	glfwSetFramebufferSizeCallback(m_pWindow, FramebufferResizeCallback);
 }
 
 void App::InitVulkan()
@@ -66,10 +68,19 @@ void App::MainLoop()
 void App::Draw()
 {
 	vkWaitForFences(m_Device, 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
-	vkResetFences(m_Device, 1, &m_InFlightFences[m_CurrentFrame]);
 
 	uint32_t ImageIndex;
-	vkAcquireNextImageKHR(m_Device, m_SwapChain, std::numeric_limits<uint64_t>::max(), m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
+	VkResult Result = vkAcquireNextImageKHR(m_Device, m_SwapChain, std::numeric_limits<uint64_t>::max(), m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
+
+	if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR)
+	{
+		RecreateSwapChainAndRelevantObject();
+		return;
+	}
+	else if (Result != VK_SUCCESS)
+	{
+		std::runtime_error("Failed to acquire swap chain image!");
+	}
 
 	VkSubmitInfo SubmitInfo = {};
 	SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -85,6 +96,8 @@ void App::Draw()
 	VkSemaphore SignalSemaphores[] = { m_RenderFinishedSemaphores[m_CurrentFrame] };
 	SubmitInfo.signalSemaphoreCount = 1;
 	SubmitInfo.pSignalSemaphores = SignalSemaphores;
+
+	vkResetFences(m_Device, 1, &m_InFlightFences[m_CurrentFrame]);
 
 	if (vkQueueSubmit(m_GraphicsQueue, 1, &SubmitInfo, m_InFlightFences[m_CurrentFrame]) != VK_SUCCESS)
 	{
@@ -102,7 +115,18 @@ void App::Draw()
 	PresentInfo.pImageIndices = &ImageIndex;
 	PresentInfo.pResults = nullptr;
 
-	vkQueuePresentKHR(m_PresentQueue, &PresentInfo);
+	Result = vkQueuePresentKHR(m_PresentQueue, &PresentInfo);
+
+	if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR || m_bFramebufferResized)
+	{
+		m_bFramebufferResized = false;
+		RecreateSwapChainAndRelevantObject();
+		return;
+	}
+	else if (Result != VK_SUCCESS)
+	{
+		std::runtime_error("Failed to acquire swap chain image!");
+	}
 
 	m_CurrentFrame = (m_CurrentFrame + 1) % m_MaxFramesInFlights;
 }
@@ -116,25 +140,9 @@ void App::Destroy()
 		vkDestroyFence(m_Device, m_InFlightFences[i], nullptr);
 	}
 
+	DestroySwapChainAndRelevantObject();
+
 	vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
-
-	for (auto & Framebuffer : m_SwapChainFramebuffers)
-	{
-		vkDestroyFramebuffer(m_Device, Framebuffer, nullptr);
-	}
-
-	vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
-
-	vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
-
-	vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
-
-	for (auto & SwapChainImageView : m_SwapChainImageViews)
-	{
-		vkDestroyImageView(m_Device, SwapChainImageView, nullptr);
-	}
-	
-	vkDestroySwapchainKHR(m_Device, m_SwapChain, nullptr);
 	
 	vkDestroyDevice(m_Device, nullptr);
 	
@@ -150,6 +158,56 @@ void App::Destroy()
 	glfwDestroyWindow(m_pWindow);
 	
 	glfwTerminate();
+}
+
+
+void App::RecreateSwapChainAndRelevantObject()
+{
+	int Width = 0, Height = 0;
+	while (Width == 0 || Height == 0)
+	{
+		glfwGetFramebufferSize(m_pWindow, &Width, &Height);
+		glfwWaitEvents();
+	}
+
+	vkDeviceWaitIdle(m_Device);
+
+	DestroySwapChainAndRelevantObject();
+
+	CreateSwapChain();
+
+	CreateSwapChainImageViews();
+
+	CreateRenderPass();
+
+	CreateGraphicsPipeline();
+
+	CreateFramebuffers();
+
+	CreateCommandBuffers();
+}
+
+void App::DestroySwapChainAndRelevantObject()
+{
+	for (auto & Framebuffer : m_SwapChainFramebuffers)
+	{
+		vkDestroyFramebuffer(m_Device, Framebuffer, nullptr);
+	}
+
+	vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
+
+	vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
+
+	vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
+
+	for (auto & SwapChainImageView : m_SwapChainImageViews)
+	{
+		vkDestroyImageView(m_Device, SwapChainImageView, nullptr);
+	}
+
+	vkDestroySwapchainKHR(m_Device, m_SwapChain, nullptr);
+
+	vkFreeCommandBuffers(m_Device, m_CommandPool, static_cast<uint32_t>(m_CommandBuffers.size()), m_CommandBuffers.data());
 }
 
 void App::CreateInstance()
@@ -428,7 +486,7 @@ void App::CreateSwapChain()
 	SwapChainSupportDetails SwapChainSupport = QuerySwapChainSupport(m_PhysicalDevice, m_Surface);
 	VkSurfaceFormatKHR SurfaceFormat = ChooseSwapSurfaceFormat(SwapChainSupport.Formats);
 	VkPresentModeKHR PresentMode = ChooseSwapPresentMode(SwapChainSupport.PresentModes);
-	VkExtent2D Extent = ChooseSwapExtent(SwapChainSupport.Capabilities);
+	VkExtent2D Extent = ChooseSwapExtent(m_pWindow, SwapChainSupport.Capabilities);
 
 	uint32_t ImageCount = SwapChainSupport.Capabilities.minImageCount + 1;
 	if (SwapChainSupport.Capabilities.maxImageCount > 0 && ImageCount > SwapChainSupport.Capabilities.maxImageCount)
@@ -517,7 +575,7 @@ void App::CreateSwapChain()
 	return BestMode;
 }
 
-/** Helper */VkExtent2D App::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR & Capabilities) const
+/** Helper */VkExtent2D App::ChooseSwapExtent(GLFWwindow * pWindow, const VkSurfaceCapabilitiesKHR & Capabilities) const
 {
 	if (Capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
 	{
@@ -525,7 +583,10 @@ void App::CreateSwapChain()
 	}
 	else
 	{
-		VkExtent2D ActualExtent = { m_Width, m_Height };
+		int Width, Height;
+		glfwGetFramebufferSize(pWindow, &Width, &Height);
+
+		VkExtent2D ActualExtent = { static_cast<uint32_t>(m_InitWidth), static_cast<uint32_t>(m_InitHeight) };
 		ActualExtent.width = std::max(Capabilities.minImageExtent.width, std::min(Capabilities.maxImageExtent.width, ActualExtent.width));
 		ActualExtent.height = std::max(Capabilities.minImageExtent.height, std::min(Capabilities.maxImageExtent.height, ActualExtent.height));
 		return ActualExtent;
@@ -889,6 +950,19 @@ void App::CreateSyncObjects()
 {
 	std::cerr << "[Validation layer]" << pCallbackData->pMessage << std::endl;
 	return VK_FALSE;
+}
+
+/** Callback */void App::FramebufferResizeCallback(
+	GLFWwindow * pWindow, 
+	int Width, 
+	int Height
+)
+{
+	App * pApp = reinterpret_cast<App*>(glfwGetWindowUserPointer(pWindow));
+	if (pApp != nullptr)
+	{
+		pApp->m_bFramebufferResized = true;
+	}
 }
 
 /** Loader */VkResult App::vkCreateDebugUtilsMessengerEXT(

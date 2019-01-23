@@ -46,6 +46,12 @@ protected:
 	void Draw();
 	void Destroy();
 
+	/** Recreate the swapchain and all the objects depend on it. */
+	void RecreateSwapChainAndRelevantObject();
+
+	/** Destroy the objects that are to be recreated in the RecreateSwapChain(). */
+	void DestroySwapChainAndRelevantObject();
+
 protected:
 	/** Step 1 */
 	void CreateInstance();
@@ -72,7 +78,7 @@ protected:
 	void CreateSwapChain();
 	/** Helper */VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> & AvailableFormats) const;
 	/** Helper */VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> & AvailablePresentModes) const;
-	/** Helper */VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR & Capabilities) const;
+	/** Helper */VkExtent2D ChooseSwapExtent(GLFWwindow * pWindow, const VkSurfaceCapabilitiesKHR & Capabilities) const;
 	
 	/** Step 7 */
 	void CreateSwapChainImageViews();
@@ -104,6 +110,12 @@ protected:
 		void * pUserData
 	);
 
+	/** Callback */static void FramebufferResizeCallback(
+		GLFWwindow * pWindow, 
+		int Width, 
+		int Height
+	);
+
 	/** Loader */static VkResult vkCreateDebugUtilsMessengerEXT(
 		VkInstance Instance,
 		const VkDebugUtilsMessengerCreateInfoEXT * pCreateInfo,
@@ -121,11 +133,12 @@ protected:
 
 protected:
 	GLFWwindow * m_pWindow = nullptr;
-	uint32_t m_Width = 800;
-	uint32_t m_Height = 600;
+	uint32_t m_InitWidth = 800;
+	uint32_t m_InitHeight = 600;
 	std::string m_Title = "Vulkan";
 	std::string m_AppName = "VulkanApp";
 	std::string m_EngineName = "VulkanEngine";
+	bool m_bFramebufferResized = false;
 
 protected:
 #ifdef NDEBUG
