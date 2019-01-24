@@ -1,3 +1,3 @@
-%VULKAN_SDK%/Bin/glslangValidator -V Triangle.vert
-%VULKAN_SDK%/Bin/glslangValidator -V Triangle.frag
+%VULKAN_SDK%/Bin/glslangValidator -V Shader.vert
+%VULKAN_SDK%/Bin/glslangValidator -V Shader.frag
 pause

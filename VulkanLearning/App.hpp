@@ -2,7 +2,9 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <cstdint>
 #include <string>
@@ -20,6 +22,7 @@
 #include <algorithm>
 #include <fstream>
 #include <array>
+#include <chrono>
 
 class App
 {
@@ -48,6 +51,8 @@ protected:
 	void MainLoop();
 	void Draw();
 	void Destroy();
+
+	void UpdateUniformBuffer(uint32_t CurrentImage);
 
 	/** Recreate the swapchain and all the objects depend on it. */
 	void RecreateSwapChainAndRelevantObject();
@@ -90,16 +95,19 @@ protected:
 	void CreateRenderPass();
 
 	/** Step 9 */
+	void CreateDescriptorSetLayout();
+
+	/** Step 10 */
 	void CreateGraphicsPipeline();
 	/** Helper */VkShaderModule CreateShaderModule(VkDevice Device, const std::vector<char> & ShaderCode);
 
-	/** Step 10 */
+	/** Step 11 */
 	void CreateFramebuffers();
 
-	/** Step 11 */
+	/** Step 12 */
 	void CreateCommandPool();
 
-	/** Step 12 */
+	/** Step 13 */
 	void CreateVertexBuffer();
 	/** Helper */uint32_t FindMemoryType(uint32_t TypeFilter, VkMemoryPropertyFlags Properties);
 	/** Helper */void CreateBuffer(
@@ -119,13 +127,22 @@ protected:
 		VkDeviceSize Size
 	);
 
-	/** Step 13 */
+	/** Step 14 */
 	void CreateIndexBuffer();
 
-	/** Step 14 */
+	/** Step 15 */
+	void CreateUniformBuffer();
+
+	/** Step 16 */
+	void CreateDescriptorPool();
+
+	/** Step 17 */
+	void CreateDescriptorSets();
+
+	/** Step 18 */
 	void CreateCommandBuffers();
 
-	/** Step 15 */
+	/** Step 19 */
 	void CreateSyncObjects();
 
 protected:
@@ -196,6 +213,9 @@ protected:
 	VkQueue m_PresentQueue = VK_NULL_HANDLE;
 
 	VkSwapchainKHR m_SwapChain = VK_NULL_HANDLE;
+	/** The images were created by the implementation for the swap chain and 
+	* they will be automatically cleaned up once the swap chain has been destroyed.
+	*/
 	std::vector<VkImage> m_SwapChainImages;
 	std::vector<VkImageView> m_SwapChainImageViews;
 	VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
@@ -208,6 +228,7 @@ protected:
 	std::vector<VkFramebuffer> m_SwapChainFramebuffers;
 
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
+	/** Command buffers will be automatically freed when their command pool is destroyed. */
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 
 	const int m_MaxFramesInFlights = 2;
@@ -244,4 +265,19 @@ protected:
 	VkDeviceMemory m_VertexBufferMemory = VK_NULL_HANDLE;
 	VkBuffer m_IndexBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory m_IndexBufferMemory = VK_NULL_HANDLE;
+
+protected:
+	struct UniformBufferObject
+	{
+		glm::mat4 Model;
+		glm::mat4 View;
+		glm::mat4 Projection;
+	};
+
+	VkDescriptorSetLayout m_DescriptorSetLayout = VK_NULL_HANDLE;
+	std::vector<VkBuffer> m_UniformBuffers;
+	std::vector<VkDeviceMemory> m_UniformBufferMemories;
+	VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
+	/** Descriptor sets will be automatically freed when the descriptor pool is destroyed. */
+	std::vector<VkDescriptorSet> m_DescriptorSets;
 };
