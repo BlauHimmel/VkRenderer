@@ -39,7 +39,9 @@ protected:
 	void Draw();
 	void Destroy();
 
-	void UpdateUniformBuffer(uint32_t CurrentImage);
+	void UpdateUniformBuffer(
+		uint32_t CurrentImage
+	);
 
 	/** Recreate the swapchain and all the objects depend on it. */
 	void RecreateSwapChainAndRelevantObject();
@@ -48,88 +50,133 @@ protected:
 	void DestroySwapChainAndRelevantObject();
 
 protected:
-	/** Step 1 */
 	void CreateInstance();
 	/** Helper */bool CheckValidationLayerSupport() const;
 	/** Helper */std::vector<const char *> GetRequiredExtensions() const;
 
-	/** Step 2 */
 	void SetupDebugMessenger();
 
-	/** Step 3 */
 	void CreateSurface();
 
-	/** Step 4 */
 	void SelectPhysicalDevice();
 
-	/** Step 5 */
 	void CreateLogicalDevice();
-	/** Helper */bool IsPhysicalDeviceSuitable(VkPhysicalDevice Device, VkSurfaceKHR Surface) const;
-	/** Helper */QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice Device) const;
-	/** Helper */bool CheckPhysicalDeviceExtensionsSupport(VkPhysicalDevice Device) const;
-	/** Helper */SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice Device, VkSurfaceKHR Surface) const;
+	/** Helper */bool IsPhysicalDeviceSuitable(
+		VkPhysicalDevice Device, 
+		VkSurfaceKHR Surface
+	) const;
+	/** Helper */QueueFamilyIndices FindQueueFamilies(
+		VkPhysicalDevice Device
+	) const;
+	/** Helper */bool CheckPhysicalDeviceExtensionsSupport(
+		VkPhysicalDevice Device
+	) const;
+	/** Helper */SwapChainSupportDetails QuerySwapChainSupport(
+		VkPhysicalDevice Device, 
+		VkSurfaceKHR Surface
+	) const;
 
-	/** Step 6 */
 	void CreateSwapChain();
-	/** Helper */VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> & AvailableFormats) const;
-	/** Helper */VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> & AvailablePresentModes) const;
-	/** Helper */VkExtent2D ChooseSwapExtent(GLFWwindow * pWindow, const VkSurfaceCapabilitiesKHR & Capabilities) const;
+	/** Helper */VkSurfaceFormatKHR ChooseSwapSurfaceFormat(
+		const std::vector<VkSurfaceFormatKHR> & AvailableFormats
+	) const;
+	/** Helper */VkPresentModeKHR ChooseSwapPresentMode(
+		const std::vector<VkPresentModeKHR> & AvailablePresentModes
+	) const;
+	/** Helper */VkExtent2D ChooseSwapExtent(
+		GLFWwindow * pWindow, 
+		const VkSurfaceCapabilitiesKHR & Capabilities
+	) const;
 	
-	/** Step 7 */
 	void CreateSwapChainImageViews();
 
-	/** Step 8 */
 	void CreateRenderPass();
 
-	/** Step 9 */
 	void CreateDescriptorSetLayout();
 
-	/** Step 10 */
 	void CreateGraphicsPipeline();
-	/** Helper */VkShaderModule CreateShaderModule(VkDevice Device, const std::vector<char> & ShaderCode);
+	/** Helper */VkShaderModule CreateShaderModule(
+		VkDevice Device, 
+		const std::vector<char> & ShaderCode
+	);
 
-	/** Step 11 */
 	void CreateFramebuffers();
 
-	/** Step 12 */
 	void CreateCommandPool();
 
-	/** Step 13 */
-	void CreateVertexBuffer();
-	/** Helper */uint32_t FindMemoryType(uint32_t TypeFilter, VkMemoryPropertyFlags Properties);
+	void CreateTextureBuffer();
+	/** Helper */uint32_t FindMemoryType(
+		uint32_t TypeFilter, 
+		VkMemoryPropertyFlags Properties
+	);
 	/** Helper */void CreateBuffer(
-		VkDevice Device, 
-		VkDeviceSize Size, 
-		VkBufferUsageFlags Usage, 
-		VkMemoryPropertyFlags Properties, 
-		VkBuffer & Buffer, 
+		VkDevice Device,
+		VkDeviceSize Size,
+		VkBufferUsageFlags Usage,
+		VkMemoryPropertyFlags Properties,
+		VkBuffer & Buffer,
 		VkDeviceMemory & BufferMemory
 	);
 	/** Helper */void CopyBuffer(
-		VkDevice Device, 
+		VkDevice Device,
 		VkCommandPool CommandPool,
 		VkQueue Queue,
-		VkBuffer SrcBuffer, 
-		VkBuffer DstBuffer, 
+		VkBuffer SrcBuffer,
+		VkBuffer DstBuffer,
 		VkDeviceSize Size
 	);
+	/** Helper */void CreateImage(
+		VkDevice Device,
+		uint32_t Width,
+		uint32_t Height,
+		VkFormat Format,
+		VkImageTiling Tiling,
+		VkImageUsageFlags Usage,
+		VkMemoryPropertyFlags Properties,
+		VkImage & Image,
+		VkDeviceMemory & ImageMemory
+	);
+	/** Helper */VkCommandBuffer BeginSingleTimeCommands(
+		VkDevice Device, 
+		VkCommandPool CommandPool
+	);
+	/** Helper */void EndSingleTimeCommands(
+		VkDevice Device, 
+		VkQueue Queue, 
+		VkCommandPool CommandPool, 
+		VkCommandBuffer CommandBuffer
+	);
+	/** Helper */void TransitionImageLayout(
+		VkDevice Device,
+		VkQueue Queue,
+		VkCommandPool CommandPool,
+		VkImage Image, 
+		VkFormat Format,
+		VkImageLayout OldLayout,
+		VkImageLayout NewLayout
+	);
+	/** Helper */void CopyBufferToImage(
+		VkDevice Device,
+		VkQueue Queue,
+		VkCommandPool CommandPool,
+		VkBuffer SrcBuffer,
+		VkImage DstImage,
+		uint32_t Width,
+		uint32_t Height
+	);
 
-	/** Step 14 */
+	void CreateVertexBuffer();
+
 	void CreateIndexBuffer();
 
-	/** Step 15 */
 	void CreateUniformBuffer();
 
-	/** Step 16 */
 	void CreateDescriptorPool();
 
-	/** Step 17 */
 	void CreateDescriptorSets();
 
-	/** Step 18 */
 	void CreateCommandBuffers();
 
-	/** Step 19 */
 	void CreateSyncObjects();
 
 protected:
@@ -159,7 +206,9 @@ protected:
 		const VkAllocationCallbacks * pAllocator
 	);
 
-	/** Helper */static std::vector<char> ReadFile(const std::string & Filename);
+	/** Helper */static std::vector<char> ReadFile(
+		const std::string & Filename
+	);
 
 protected:
 	GLFWwindow * m_pWindow = nullptr;
@@ -186,6 +235,9 @@ protected:
 	{
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
+
+	const std::string m_VertexShaderPath = "Shaders/Shader.vert.spv";
+	const std::string m_FragmentShaderPath = "Shaders/Shader.frag.spv";
 
 	VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;
 	VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
@@ -267,4 +319,9 @@ protected:
 	VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
 	/** Descriptor sets will be automatically freed when the descriptor pool is destroyed. */
 	std::vector<VkDescriptorSet> m_DescriptorSets;
+
+protected:
+	const std::string m_TexturePath = "Textures/Texture.jpg";
+	VkImage m_TextureImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_TextureImageMemory = VK_NULL_HANDLE;
 };
