@@ -120,9 +120,12 @@ protected:
 	);
 
 	/** Step 13 */
-	void CreateCommandBuffers();
+	void CreateIndexBuffer();
 
 	/** Step 14 */
+	void CreateCommandBuffers();
+
+	/** Step 15 */
 	void CreateSyncObjects();
 
 protected:
@@ -225,11 +228,20 @@ protected:
 
 	const std::vector<Vertex> m_Vertices = 
 	{
-		{ {  0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
-		{ {  0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-		{ { -0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } }
+		{ { -0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
+		{ {  0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f } },
+		{ {  0.5f,  0.5f },{ 0.0f, 0.0f, 1.0f } },
+		{ { -0.5f,  0.5f },{ 1.0f, 1.0f, 1.0f } }
+	};
+
+	const std::vector<uint32_t> m_Indices = 
+	{
+		0, 1, 2,
+		2, 3, 0
 	};
 
 	VkBuffer m_VertexBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory m_VertexBufferMemory = VK_NULL_HANDLE;
+	VkBuffer m_IndexBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory m_IndexBufferMemory = VK_NULL_HANDLE;
 };
