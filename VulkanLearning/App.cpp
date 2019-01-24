@@ -1,5 +1,21 @@
 #include "App.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <set>
+#include <chrono>
+#include <algorithm>
+#include <fstream>
+#include <limits>
+#include <iostream>
+#include <memory>
+#include <cstring>
+#include <exception>
+#include <stdexcept>
+
 bool App::QueueFamilyIndices::IsComplete() const
 {
 	return GraphicsFamily.has_value() && PresentFamily.has_value();
@@ -69,8 +85,8 @@ void App::InitVulkan()
 void App::MainLoop()
 {
 	static uint64_t Frame = 0;
-	static clock_t PrevClock = clock();
-	static clock_t CurrClock = clock();
+	static auto PrevTime = std::chrono::high_resolution_clock::now();
+	static auto CurrTime = std::chrono::high_resolution_clock::now();
 	static double DeltaTime = 0.0f;
 
 	while (!glfwWindowShouldClose(m_pWindow))
@@ -79,12 +95,13 @@ void App::MainLoop()
 		Draw();
 
 		Frame++;
-		CurrClock = clock();
-		DeltaTime = static_cast<double>(CurrClock - PrevClock) / static_cast<double>(CLOCKS_PER_SEC);
+		CurrTime = std::chrono::high_resolution_clock::now();
+		DeltaTime = std::chrono::duration<double, std::chrono::seconds::period>(CurrTime - PrevTime).count();
+
 		if (DeltaTime >= 1.0f)
 		{
 			m_FPS = static_cast<double>(Frame) / DeltaTime;
-			PrevClock = CurrClock;
+			PrevTime = CurrTime;
 			Frame = 0;
 
 			char Buffer[256];

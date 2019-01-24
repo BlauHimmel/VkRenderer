@@ -4,25 +4,12 @@
 #include <GLFW/glfw3.h>
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <cstdint>
 #include <string>
-#include <cstring>
-#include <exception>
-#include <stdexcept>
-#include <memory>
-#include <iostream>
 #include <vector>
-#include <optional>
-#include <set>
-#include <limits>
-#include <cmath>
-#include <ctime>
-#include <algorithm>
-#include <fstream>
 #include <array>
-#include <chrono>
+#include <optional>
 
 class App
 {
@@ -269,9 +256,9 @@ protected:
 protected:
 	struct UniformBufferObject
 	{
-		glm::mat4 Model;
-		glm::mat4 View;
-		glm::mat4 Projection;
+		alignas(16) glm::mat4 Model;
+		alignas(16) glm::mat4 View;
+		alignas(16) glm::mat4 Projection;
 	};
 
 	VkDescriptorSetLayout m_DescriptorSetLayout = VK_NULL_HANDLE;

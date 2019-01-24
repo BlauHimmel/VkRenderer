@@ -3,7 +3,7 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <IncludePath>$(VULKAN_SDK)\Include;$(SolutionDir)Extensions\glm\include;$(SolutionDir)Extensions\glfw\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\Include;$(SolutionDir)Extensions\glm\include;$(SolutionDir)Extensions\glfw\include;$(SolutionDir)Extensions\stb_image\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(VULKAN_SDK)\Lib;$(SolutionDir)Extensions\glm\lib\release;$(SolutionDir)Extensions\glfw\lib\release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup>
