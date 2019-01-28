@@ -19,10 +19,79 @@
 #include <array>
 #include <optional>
 
+/** An very simple vulkan application. */
 class App
 {
+public:
+	void Run();
+
 protected:
-	struct QueueFamilyIndices
+	/** App */void InitWindow();
+	/** App */void InitVulkan();
+	/** App */void MainLoop();
+	/** App */void Draw();
+	/** App */void Destroy();
+
+protected:
+	/** App Helper */void UpdateUniformBuffer(
+		uint32_t CurrentImage
+	);
+
+	/** Recreate the swapchain and all the objects depend on it. */
+	/** App Helper */void RecreateSwapChainAndRelevantObject();
+
+	/** Destroy the objects that are to be recreated in the RecreateSwapChain(). */
+	/** App Helper */void DestroySwapChainAndRelevantObject();
+
+protected:
+	/** Vulkan Init */void CreateInstance();
+	
+	/** Vulkan Init */void SetupDebugMessenger();
+
+	/** Vulkan Init */void CreateSurface();
+
+	/** Vulkan Init */void SelectPhysicalDevice();
+
+	/** Vulkan Init */void CreateLogicalDevice();
+
+	/** Vulkan Init */void CreateSwapChain();
+	
+	/** Vulkan Init */void CreateSwapChainImageViews();
+	
+	/** Vulkan Init */void CreateRenderPass();
+
+	/** Vulkan Init */void CreateDescriptorSetLayout();
+
+	/** Vulkan Init */void CreateGraphicsPipeline();
+	
+	/** Vulkan Init */void CreateCommandPool();
+
+	/** Vulkan Init */void CreateDepthResource();
+
+	/** Vulkan Init */void CreateFramebuffers();
+
+	/** Vulkan Init */void CreateTextureImage();
+	
+	/** Vulkan Init */void CreateTextureImageView();
+
+	/** Vulkan Init */void CreateTextureSampler();
+	 
+	/** Vulkan Init */void CreateVertexBuffer();
+
+	/** Vulkan Init */void CreateIndexBuffer();
+
+	/** Vulkan Init */void CreateUniformBuffer();
+
+	/** Vulkan Init */void CreateDescriptorPool();
+
+	/** Vulkan Init */void CreateDescriptorSets();
+
+	/** Vulkan Init */void CreateCommandBuffers();
+
+	/** Vulkan Init */void CreateSyncObjects();
+
+protected:
+	/** Helper Struct */struct QueueFamilyIndices
 	{
 		std::optional<uint32_t> GraphicsFamily;
 		std::optional<uint32_t> PresentFamily;
@@ -30,99 +99,80 @@ protected:
 		bool IsComplete() const;
 	};
 
-	struct SwapChainSupportDetails
+	/** Helper Struct */struct SwapChainSupportDetails
 	{
 		VkSurfaceCapabilitiesKHR Capabilities;
 		std::vector<VkSurfaceFormatKHR> Formats;
 		std::vector<VkPresentModeKHR> PresentModes;
 	};
 
-public:
-	void Run();
-
 protected:
-	void InitWindow();
-	void InitVulkan();
-	void MainLoop();
-	void Draw();
-	void Destroy();
-
-	void UpdateUniformBuffer(
-		uint32_t CurrentImage
-	);
-
-	/** Recreate the swapchain and all the objects depend on it. */
-	void RecreateSwapChainAndRelevantObject();
-
-	/** Destroy the objects that are to be recreated in the RecreateSwapChain(). */
-	void DestroySwapChainAndRelevantObject();
-
-protected:
-	void CreateInstance();
 	/** Helper */bool CheckValidationLayerSupport() const;
+
 	/** Helper */std::vector<const char *> GetRequiredExtensions() const;
 
-	void SetupDebugMessenger();
-
-	void CreateSurface();
-
-	void SelectPhysicalDevice();
 	/** Helper */bool IsPhysicalDeviceSuitable(
 		VkPhysicalDevice Device,
 		VkSurfaceKHR Surface
 	) const;
 
-	void CreateLogicalDevice();
 	/** Helper */QueueFamilyIndices FindQueueFamilies(
 		VkPhysicalDevice Device
 	) const;
+
 	/** Helper */bool CheckPhysicalDeviceExtensionsSupport(
 		VkPhysicalDevice Device
 	) const;
+
 	/** Helper */SwapChainSupportDetails QuerySwapChainSupport(
-		VkPhysicalDevice Device, 
+		VkPhysicalDevice Device,
 		VkSurfaceKHR Surface
 	) const;
 
-	void CreateSwapChain();
 	/** Helper */VkSurfaceFormatKHR ChooseSwapSurfaceFormat(
 		const std::vector<VkSurfaceFormatKHR> & AvailableFormats
 	) const;
+
 	/** Helper */VkPresentModeKHR ChooseSwapPresentMode(
 		const std::vector<VkPresentModeKHR> & AvailablePresentModes
 	) const;
+	
 	/** Helper */VkExtent2D ChooseSwapExtent(
-		GLFWwindow * pWindow, 
+		GLFWwindow * pWindow,
 		const VkSurfaceCapabilitiesKHR & Capabilities
 	) const;
-	
-	void CreateSwapChainImageViews();
+
 	/** Helper */void CreateImageView(
 		VkDevice Device,
 		VkImage Image,
 		VkFormat Format,
+		VkImageAspectFlags AspectFlags,
 		VkImageView & ImageView
 	);
 
-	void CreateRenderPass();
-
-	void CreateDescriptorSetLayout();
-
-	void CreateGraphicsPipeline();
 	/** Helper */VkShaderModule CreateShaderModule(
-		VkDevice Device, 
+		VkDevice Device,
 		const std::vector<char> & ShaderCode
 	);
 
-	void CreateFramebuffers();
+	/** Helper */VkFormat FindSupportedFormat(
+		VkPhysicalDevice Device,
+		const std::vector<VkFormat> & Candidates,
+		VkImageTiling Tiling,
+		VkFormatFeatureFlags Features
+	) const;
 
-	void CreateCommandPool();
+	/** Helper */VkFormat FindDepthFormat();
 
-	void CreateTextureImage();
+	/** Helper */bool HasStencilComponent(
+		VkFormat Format
+	) const;
+
 	/** Helper */uint32_t FindMemoryType(
-		uint32_t TypeFilter, 
+		uint32_t TypeFilter,
 		VkMemoryPropertyFlags Properties
 	);
+
 	/** Helper */void CreateBuffer(
 		VkDevice Device,
 		VkDeviceSize Size,
@@ -131,6 +181,7 @@ protected:
 		VkBuffer & Buffer,
 		VkDeviceMemory & BufferMemory
 	);
+
 	/** Helper */void CopyBuffer(
 		VkDevice Device,
 		VkCommandPool CommandPool,
@@ -139,6 +190,7 @@ protected:
 		VkBuffer DstBuffer,
 		VkDeviceSize Size
 	);
+
 	/** Helper */void CreateImage(
 		VkDevice Device,
 		uint32_t Width,
@@ -150,25 +202,29 @@ protected:
 		VkImage & Image,
 		VkDeviceMemory & ImageMemory
 	);
+
 	/** Helper */VkCommandBuffer BeginSingleTimeCommands(
-		VkDevice Device, 
+		VkDevice Device,
 		VkCommandPool CommandPool
 	);
+
 	/** Helper */void EndSingleTimeCommands(
-		VkDevice Device, 
-		VkQueue Queue, 
-		VkCommandPool CommandPool, 
+		VkDevice Device,
+		VkQueue Queue,
+		VkCommandPool CommandPool,
 		VkCommandBuffer CommandBuffer
 	);
+
 	/** Helper */void TransitionImageLayout(
 		VkDevice Device,
 		VkQueue Queue,
 		VkCommandPool CommandPool,
-		VkImage Image, 
+		VkImage Image,
 		VkFormat Format,
 		VkImageLayout OldLayout,
 		VkImageLayout NewLayout
 	);
+
 	/** Helper */void CopyBufferToImage(
 		VkDevice Device,
 		VkQueue Queue,
@@ -178,24 +234,6 @@ protected:
 		uint32_t Width,
 		uint32_t Height
 	);
-
-	void CreateTextureImageView();
-
-	void CreateTextureSampler();
-	 
-	void CreateVertexBuffer();
-
-	void CreateIndexBuffer();
-
-	void CreateUniformBuffer();
-
-	void CreateDescriptorPool();
-
-	void CreateDescriptorSets();
-
-	void CreateCommandBuffers();
-
-	void CreateSyncObjects();
 
 protected:
 	/** Callback */static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
@@ -228,7 +266,7 @@ protected:
 		const std::string & Filename
 	);
 
-protected:
+protected: /** App */
 	GLFWwindow * m_pWindow = nullptr;
 	uint32_t m_InitWidth = 800;
 	uint32_t m_InitHeight = 600;
@@ -239,7 +277,7 @@ protected:
 	bool m_bFramebufferResized = false;
 	double m_FPS = 0.0f;
 
-protected:
+protected: /** Vulkan pipeline */
 #ifdef NDEBUG
 	const bool m_bEnableValidationLayers = false;
 #else
@@ -283,6 +321,10 @@ protected:
 	VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
 	VkPipeline m_GraphicsPipeline = VK_NULL_HANDLE;
 
+	VkImage m_DepthImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_DepthImageMemory = VK_NULL_HANDLE;
+	VkImageView m_DepthImageView = VK_NULL_HANDLE;
+
 	std::vector<VkFramebuffer> m_SwapChainFramebuffers;
 
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
@@ -295,7 +337,7 @@ protected:
 	std::vector<VkFence> m_InFlightFences;
 	size_t m_CurrentFrame = 0;
 
-protected:
+protected: /** Mesh */
 	struct Vertex
 	{
 		glm::vec3 Position;
@@ -333,7 +375,7 @@ protected:
 	VkBuffer m_IndexBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory m_IndexBufferMemory = VK_NULL_HANDLE;
 
-protected:
+protected: /** UBO */
 	struct UniformBufferObject
 	{
 		glm::mat4 Model;
@@ -348,7 +390,7 @@ protected:
 	/** Descriptor sets will be automatically freed when the descriptor pool is destroyed. */
 	std::vector<VkDescriptorSet> m_DescriptorSets;
 
-protected:
+protected: /** Texture */
 	const std::string m_TexturePath = "Textures/Texture.jpg";
 	VkImage m_TextureImage = VK_NULL_HANDLE;
 	VkDeviceMemory m_TextureImageMemory = VK_NULL_HANDLE;
