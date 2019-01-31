@@ -75,6 +75,8 @@ protected:
 	/** Vulkan Init */void CreateTextureImageView();
 
 	/** Vulkan Init */void CreateTextureSampler();
+
+	/** Vulkan Init */void LoadModel();
 	 
 	/** Vulkan Init */void CreateVertexBuffer();
 
@@ -348,27 +350,9 @@ protected: /** Mesh */
 		static std::array<VkVertexInputAttributeDescription, 3> GetAttributeDescription();
 	};
 
-	const std::vector<Vertex> m_Vertices = 
-	{
-		{ { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
-		{ {  0.5f, -0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
-		{ {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } },
-		{ { -0.5f,  0.5f,  0.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } },
-
-		{ { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
-		{ {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
-		{ {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } },
-		{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } }
-
-	};
-
-	const std::vector<uint32_t> m_Indices = 
-	{
-		0, 1, 2,
-		2, 3, 0,
-		4, 5, 6,
-		6, 7, 4
-	};
+	const std::string m_ModelPath = "Models/chalet.obj";
+	std::vector<Vertex> m_Vertices;
+	std::vector<uint32_t> m_Indices;
 
 	VkBuffer m_VertexBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory m_VertexBufferMemory = VK_NULL_HANDLE;
@@ -391,7 +375,7 @@ protected: /** UBO */
 	std::vector<VkDescriptorSet> m_DescriptorSets;
 
 protected: /** Texture */
-	const std::string m_TexturePath = "Textures/Texture.jpg";
+	const std::string m_TexturePath = "Textures/chalet.jpg";
 	VkImage m_TextureImage = VK_NULL_HANDLE;
 	VkDeviceMemory m_TextureImageMemory = VK_NULL_HANDLE;
 	VkImageView m_TextureImageView = VK_NULL_HANDLE;

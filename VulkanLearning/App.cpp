@@ -5,6 +5,9 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #include <set>
 #include <chrono>
 #include <algorithm>
@@ -69,6 +72,8 @@ void App::Run()
 	CreateTextureImageView();
 
 	CreateTextureSampler();
+
+	LoadModel();
 
 	CreateVertexBuffer();
 
@@ -431,16 +436,20 @@ void App::Run()
 	std::unique_ptr<VkPhysicalDevice[]> PhysicalDevices(new VkPhysicalDevice[DeviceCount]);
 	vkEnumeratePhysicalDevices(m_Instance, &DeviceCount, PhysicalDevices.get());
 
+	uint32_t MaxMemoryAllocationCount = 0;
 	for (uint32_t i = 0; i < DeviceCount; i++)
 	{
 		if (IsPhysicalDeviceSuitable(PhysicalDevices[i], m_Surface))
 		{
-			m_PhysicalDevice = PhysicalDevices[i];
-			
 			VkPhysicalDeviceProperties PhysicalDeviceProperties;
-			vkGetPhysicalDeviceProperties(m_PhysicalDevice, &PhysicalDeviceProperties);
-			m_GpuName = PhysicalDeviceProperties.deviceName;
-			break;
+			vkGetPhysicalDeviceProperties(PhysicalDevices[i], &PhysicalDeviceProperties);
+
+			if (PhysicalDeviceProperties.limits.maxMemoryAllocationCount > MaxMemoryAllocationCount)
+			{
+				m_PhysicalDevice = PhysicalDevices[i];
+				m_GpuName = PhysicalDeviceProperties.deviceName;
+				MaxMemoryAllocationCount = PhysicalDeviceProperties.limits.maxMemoryAllocationCount;
+			}
 		}
 	}
 
@@ -1053,6 +1062,51 @@ void App::Run()
 	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_TextureSamler) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create texture sampler!");
+	}
+}
+
+void App::LoadModel()
+{
+	tinyobj::attrib_t Attrib;
+	std::vector<tinyobj::shape_t> Shapes;
+	std::vector<tinyobj::material_t> Materials;
+	std::string Warn, Error;
+
+	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Error, m_ModelPath.c_str()))
+	{
+		throw std::runtime_error(Warn + Error);
+	}
+
+	for (const auto & Shape : Shapes)
+	{
+		for (const auto & Index : Shape.mesh.indices)
+		{
+			Vertex Vertex = {};
+
+			Vertex.Position =
+			{
+				Attrib.vertices[3 * Index.vertex_index + 0],
+				Attrib.vertices[3 * Index.vertex_index + 1],
+				Attrib.vertices[3 * Index.vertex_index + 2]
+			};
+
+			Vertex.Color = { 1.0f, 1.0f, 1.0f };
+
+			Vertex.TexCoord =
+			{
+				Attrib.texcoords[2 * Index.texcoord_index + 0],
+				Attrib.texcoords[2 * Index.texcoord_index + 1]
+			};
+
+			/**
+			 * The problem is that the origin of texture coordinates in Vulkan is the top-left corner, 
+			 * whereas the OBJ format assumes the bottom-left corner. 
+			 */
+			Vertex.TexCoord.y = 1.0f - Vertex.TexCoord.y;
+
+			m_Vertices.push_back(Vertex);
+			m_Indices.push_back(static_cast<uint32_t>(m_Indices.size()));
+		}
 	}
 }
 
