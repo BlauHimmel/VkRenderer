@@ -19,6 +19,15 @@
 #include <array>
 #include <optional>
 
+//TODO :
+//    1. Update the vertex/index buffer while the app is running.
+//    2. Update the texture while the app is running.
+//    3. Add UI.
+//    4. Add lighting.
+//    5. PBR material.
+//    6. Use environment map.
+//    7. Implement IBR.
+
 /** An very simple vulkan application. */
 class App
 {
