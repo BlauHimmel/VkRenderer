@@ -76,7 +76,7 @@ protected:
 
 	/** Vulkan Init */void CreateTextureSampler();
 
-	/** Vulkan Init */void LoadModel();
+	/** Vulkan Init */void LoadObjModel(bool bDuplicatedVertexOptimization = false);
 	 
 	/** Vulkan Init */void CreateVertexBuffer();
 
@@ -258,7 +258,7 @@ protected:
 		VkDebugUtilsMessengerEXT * pDebugMessenger
 	);
 
-	/** Loader */static void vkDestroyDebugUtilsMessengerEXT(
+	/** Loader */static VkResult vkDestroyDebugUtilsMessengerEXT(
 		VkInstance Instance,
 		VkDebugUtilsMessengerEXT DebugMessenger,
 		const VkAllocationCallbacks * pAllocator
@@ -350,7 +350,18 @@ protected: /** Mesh */
 		static std::array<VkVertexInputAttributeDescription, 3> GetAttributeDescription();
 	};
 
+	struct VertexHash
+	{
+		size_t operator()(const Vertex & Rhs) const;
+	};
+
+	struct VertexEqual
+	{
+		bool operator()(const Vertex & Lhs, const Vertex & Rhs) const;
+	};
+
 	const std::string m_ModelPath = "Models/chalet.obj";
+	const bool m_bDuplicatedVertexOptimization = false;
 	std::vector<Vertex> m_Vertices;
 	std::vector<uint32_t> m_Indices;
 

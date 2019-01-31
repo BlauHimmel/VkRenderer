@@ -5,6 +5,9 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
@@ -18,6 +21,7 @@
 #include <cstring>
 #include <exception>
 #include <stdexcept>
+#include <unordered_map>
 
 void App::Run()
 {
@@ -73,7 +77,7 @@ void App::Run()
 
 	CreateTextureSampler();
 
-	LoadModel();
+	LoadObjModel(m_bDuplicatedVertexOptimization);
 
 	CreateVertexBuffer();
 
@@ -115,7 +119,13 @@ void App::Run()
 			Frame = 0;
 
 			char Buffer[256];
-			sprintf_s(Buffer, "%s [%s] Fps: %lf", m_Title.c_str(), m_GpuName.c_str(), m_FPS);
+			sprintf_s(
+				Buffer, "%s [Vertex : %d] [%s] Fps: %lf", 
+				m_Title.c_str(), 
+				static_cast<int32_t>(m_Vertices.size()), 
+				m_GpuName.c_str(),
+				m_FPS
+			);
 			glfwSetWindowTitle(m_pWindow, Buffer);
 		}
 	}
@@ -1065,12 +1075,13 @@ void App::Run()
 	}
 }
 
-void App::LoadModel()
+void App::LoadObjModel(bool bDuplicatedVertexOptimization)
 {
 	tinyobj::attrib_t Attrib;
 	std::vector<tinyobj::shape_t> Shapes;
 	std::vector<tinyobj::material_t> Materials;
 	std::string Warn, Error;
+	std::unordered_map<Vertex, uint32_t, VertexHash, VertexEqual> UniqueVertices = {};
 
 	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Error, m_ModelPath.c_str()))
 	{
@@ -1104,8 +1115,20 @@ void App::LoadModel()
 			 */
 			Vertex.TexCoord.y = 1.0f - Vertex.TexCoord.y;
 
-			m_Vertices.push_back(Vertex);
-			m_Indices.push_back(static_cast<uint32_t>(m_Indices.size()));
+			if (bDuplicatedVertexOptimization)
+			{
+				if (UniqueVertices.count(Vertex) == 0)
+				{
+					UniqueVertices[Vertex] = static_cast<uint32_t>(m_Vertices.size());
+					m_Vertices.push_back(Vertex);
+				}
+				m_Indices.push_back(UniqueVertices[Vertex]);
+			}
+			else
+			{
+				m_Vertices.push_back(Vertex);
+				m_Indices.push_back(static_cast<uint32_t>(m_Indices.size()));
+			}
 		}
 	}
 }
@@ -2023,7 +2046,7 @@ void App::LoadModel()
 	}
 }
 
-/** Loader */void App::vkDestroyDebugUtilsMessengerEXT(
+/** Loader */VkResult App::vkDestroyDebugUtilsMessengerEXT(
 	VkInstance Instance,
 	VkDebugUtilsMessengerEXT DebugMessenger,
 	const VkAllocationCallbacks * pAllocator
@@ -2033,6 +2056,10 @@ void App::LoadModel()
 	if (Func != nullptr)
 	{
 		Func(Instance, DebugMessenger, pAllocator);
+	}
+	else
+	{
+		return VK_ERROR_EXTENSION_NOT_PRESENT;
 	}
 }
 
@@ -2051,6 +2078,20 @@ void App::LoadModel()
 	File.read(Buffer.data(), Buffer.size());
 	File.close();
 	return Buffer;
+}
+
+size_t App::VertexHash::operator()(const Vertex & Rhs) const
+{
+	return ((std::hash<glm::vec3>()(Rhs.Position) ^
+		(std::hash<glm::vec3>()(Rhs.Color) << 1)) >> 1) ^
+		(std::hash<glm::vec2>()(Rhs.TexCoord) << 1);
+}
+
+bool App::VertexEqual::operator()(const Vertex & Lhs, const Vertex & Rhs) const
+{
+	return Lhs.Position == Rhs.Position && 
+		Lhs.Color == Rhs.Color && 
+		Lhs.TexCoord == Rhs.TexCoord;
 }
 
 VkVertexInputBindingDescription App::Vertex::GetBindingDescription()
