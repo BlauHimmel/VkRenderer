@@ -85,7 +85,7 @@ protected:
 
 	/** Vulkan Init */void CreateTextureSampler();
 
-	/** Vulkan Init */void LoadObjModel(bool bDuplicatedVertexOptimization = false);
+	/** Vulkan Init */void LoadObjModel();
 	 
 	/** Vulkan Init */void CreateVertexBuffer();
 
@@ -353,10 +353,11 @@ protected: /** Mesh */
 	{
 		glm::vec3 Position;
 		glm::vec3 Color;
+		glm::vec3 Normal;
 		glm::vec2 TexCoord;
 
 		static VkVertexInputBindingDescription GetBindingDescription();
-		static std::array<VkVertexInputAttributeDescription, 3> GetAttributeDescription();
+		static std::array<VkVertexInputAttributeDescription, 4> GetAttributeDescription();
 	};
 
 	struct VertexHash
@@ -370,9 +371,11 @@ protected: /** Mesh */
 	};
 
 	const std::string m_ModelPath = "Models/chalet.obj";
-	const bool m_bDuplicatedVertexOptimization = false;
 	std::vector<Vertex> m_Vertices;
 	std::vector<uint32_t> m_Indices;
+
+	size_t m_VertexNum = 0;
+	size_t m_FacetNum = 0;
 
 	VkBuffer m_VertexBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory m_VertexBufferMemory = VK_NULL_HANDLE;

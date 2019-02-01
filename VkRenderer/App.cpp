@@ -77,7 +77,7 @@ void App::Run()
 
 	CreateTextureSampler();
 
-	LoadObjModel(m_bDuplicatedVertexOptimization);
+	LoadObjModel();
 
 	CreateVertexBuffer();
 
@@ -100,6 +100,7 @@ void App::Run()
 	static auto PrevTime = std::chrono::high_resolution_clock::now();
 	static auto CurrTime = std::chrono::high_resolution_clock::now();
 	static double DeltaTime = 0.0f;
+	static constexpr double TitleUpdateTime = 1.0 / 10.0;
 
 	while (!glfwWindowShouldClose(m_pWindow))
 	{
@@ -112,7 +113,7 @@ void App::Run()
 			CurrTime - PrevTime
 		).count();
 
-		if (DeltaTime >= 1.0f)
+		if (DeltaTime >= TitleUpdateTime)
 		{
 			m_FPS = static_cast<double>(Frame) / DeltaTime;
 			PrevTime = CurrTime;
@@ -120,11 +121,12 @@ void App::Run()
 
 			char Buffer[256];
 			sprintf_s(
-				Buffer, "%s [Vertex : %d] [%s] Fps: %lf", 
+				Buffer, "%s [%s] [Vertex : %d Facet : %d] Fps: %d", 
 				m_Title.c_str(), 
-				static_cast<int32_t>(m_Vertices.size()), 
 				m_GpuName.c_str(),
-				m_FPS
+				static_cast<int32_t>(m_VertexNum), 
+				static_cast<int32_t>(m_FacetNum),
+				static_cast<int32_t>(m_FPS)
 			);
 			glfwSetWindowTitle(m_pWindow, Buffer);
 		}
@@ -1075,13 +1077,18 @@ void App::Run()
 	}
 }
 
-void App::LoadObjModel(bool bDuplicatedVertexOptimization)
+void App::LoadObjModel()
 {
 	tinyobj::attrib_t Attrib;
 	std::vector<tinyobj::shape_t> Shapes;
 	std::vector<tinyobj::material_t> Materials;
 	std::string Warn, Error;
 	std::unordered_map<Vertex, uint32_t, VertexHash, VertexEqual> UniqueVertices = {};
+
+	m_Vertices.clear();
+	m_Vertices.shrink_to_fit();
+	m_Indices.clear();
+	m_Indices.shrink_to_fit();
 
 	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Error, m_ModelPath.c_str()))
 	{
@@ -1115,22 +1122,17 @@ void App::LoadObjModel(bool bDuplicatedVertexOptimization)
 			 */
 			Vertex.TexCoord.y = 1.0f - Vertex.TexCoord.y;
 
-			if (bDuplicatedVertexOptimization)
+			if (UniqueVertices.count(Vertex) == 0)
 			{
-				if (UniqueVertices.count(Vertex) == 0)
-				{
-					UniqueVertices[Vertex] = static_cast<uint32_t>(m_Vertices.size());
-					m_Vertices.push_back(Vertex);
-				}
-				m_Indices.push_back(UniqueVertices[Vertex]);
-			}
-			else
-			{
+				UniqueVertices[Vertex] = static_cast<uint32_t>(m_Vertices.size());
 				m_Vertices.push_back(Vertex);
-				m_Indices.push_back(static_cast<uint32_t>(m_Indices.size()));
 			}
+			m_Indices.push_back(UniqueVertices[Vertex]);
 		}
 	}
+
+	m_VertexNum = m_Vertices.size();
+	m_FacetNum = m_Indices.size() / 3;
 }
 
 /** Vulkan Init */void App::CreateVertexBuffer()
@@ -2099,9 +2101,9 @@ VkVertexInputBindingDescription App::Vertex::GetBindingDescription()
 	return BindingDescription;
 }
 
-std::array<VkVertexInputAttributeDescription, 3> App::Vertex::GetAttributeDescription()
+std::array<VkVertexInputAttributeDescription, 4> App::Vertex::GetAttributeDescription()
 {
-	std::array<VkVertexInputAttributeDescription, 3> AttributeDescriptions = {};
+	std::array<VkVertexInputAttributeDescription, 4> AttributeDescriptions = {};
 
 	AttributeDescriptions[0].binding = 0;
 	AttributeDescriptions[0].location = 0;
@@ -2115,8 +2117,13 @@ std::array<VkVertexInputAttributeDescription, 3> App::Vertex::GetAttributeDescri
 
 	AttributeDescriptions[2].binding = 0;
 	AttributeDescriptions[2].location = 2;
-	AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-	AttributeDescriptions[2].offset = offsetof(Vertex, TexCoord);
+	AttributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+	AttributeDescriptions[2].offset = offsetof(Vertex, Normal);
+
+	AttributeDescriptions[3].binding = 0;
+	AttributeDescriptions[3].location = 3;
+	AttributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+	AttributeDescriptions[3].offset = offsetof(Vertex, TexCoord);
 
 	return AttributeDescriptions;
 }
