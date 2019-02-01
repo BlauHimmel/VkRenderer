@@ -83,7 +83,9 @@ void App::Run()
 
 	CreateIndexBuffer();
 
-	CreateUniformBuffer();
+	CreateMvpUniformBuffer();
+
+	CreateLightUniformBuffer();
 
 	CreateDescriptorPool();
 
@@ -232,8 +234,14 @@ void App::Run()
 
 	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 	{
-		vkDestroyBuffer(m_Device, m_UniformBuffers[i], nullptr);
-		vkFreeMemory(m_Device, m_UniformBufferMemories[i], nullptr);
+		vkDestroyBuffer(m_Device, m_LightUniformBuffers[i], nullptr);
+		vkFreeMemory(m_Device, m_LightUniformBufferMemories[i], nullptr);
+	}
+
+	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	{
+		vkDestroyBuffer(m_Device, m_MvpUniformBuffers[i], nullptr);
+		vkFreeMemory(m_Device, m_MvpUniformBufferMemories[i], nullptr);
 	}
 
 	vkDestroyBuffer(m_Device, m_IndexBuffer, nullptr);
@@ -271,11 +279,12 @@ void App::Run()
 	uint32_t CurrentImage
 )
 {
+	/** Update MVP matrix */
 	static auto StartTime = std::chrono::high_resolution_clock::now();
 	auto CurrentTime = std::chrono::high_resolution_clock::now();
 	float DeltaTime = std::chrono::duration<float, std::chrono::seconds::period>(CurrentTime - StartTime).count();
 
-	UniformBufferObject Transformation = {};
+	MvpUniformBufferObject Transformation = {};
 	Transformation.Model = glm::rotate(
 		glm::mat4(1.0f), 
 		DeltaTime * glm::radians(90.0f), 
@@ -296,9 +305,19 @@ void App::Run()
 	Transformation.Projection[1][1] *= -1.0f;
 
 	void * pData = nullptr;
-	vkMapMemory(m_Device, m_UniformBufferMemories[CurrentImage], 0, sizeof(Transformation), 0, &pData);
+	vkMapMemory(m_Device, m_MvpUniformBufferMemories[CurrentImage], 0, sizeof(Transformation), 0, &pData);
 	memcpy(pData, &Transformation, sizeof(Transformation));
-	vkUnmapMemory(m_Device, m_UniformBufferMemories[CurrentImage]);
+	vkUnmapMemory(m_Device, m_MvpUniformBufferMemories[CurrentImage]);
+
+	/** Update light information */
+	LightUniformBufferObject Lighting = {};
+	Lighting.LightPosition = glm::vec3(1.5f, 0.0f, 1.5f);
+	Lighting.LightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+
+	pData = nullptr;
+	vkMapMemory(m_Device, m_LightUniformBufferMemories[CurrentImage], 0, sizeof(Lighting), 0, &pData);
+	memcpy(pData, &Lighting, sizeof(Lighting));
+	vkUnmapMemory(m_Device, m_LightUniformBufferMemories[CurrentImage]);
 }
 
 /** App Helper */void App::RecreateSwapChainAndRelevantObject()
@@ -667,23 +686,31 @@ void App::Run()
 
 /** Vulkan Init */void App::CreateDescriptorSetLayout()
 {
-	VkDescriptorSetLayoutBinding UboLayoutBinding = {};
-	UboLayoutBinding.binding = 0;
-	UboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	UboLayoutBinding.descriptorCount = 1;
-	UboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	UboLayoutBinding.pImmutableSamplers = nullptr;
+	VkDescriptorSetLayoutBinding MvpUboLayoutBinding = {};
+	MvpUboLayoutBinding.binding = 0;
+	MvpUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	MvpUboLayoutBinding.descriptorCount = 1;
+	MvpUboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	MvpUboLayoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutBinding LightUboLayoutBinding = {};
+	LightUboLayoutBinding.binding = 1;
+	LightUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	LightUboLayoutBinding.descriptorCount = 1;
+	LightUboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	LightUboLayoutBinding.pImmutableSamplers = nullptr;
 
 	VkDescriptorSetLayoutBinding SamplerLayoutBinding = {};
-	SamplerLayoutBinding.binding = 1;
+	SamplerLayoutBinding.binding = 2;
 	SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	SamplerLayoutBinding.descriptorCount = 1;
 	SamplerLayoutBinding.pImmutableSamplers = nullptr;
 	SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	std::array<VkDescriptorSetLayoutBinding, 2> Bindings =
+	std::array<VkDescriptorSetLayoutBinding, 3> Bindings =
 	{
-		UboLayoutBinding,
+		MvpUboLayoutBinding,
+		LightUboLayoutBinding,
 		SamplerLayoutBinding
 	};
 
@@ -1108,13 +1135,38 @@ void App::LoadObjModel()
 				Attrib.vertices[3 * Index.vertex_index + 2]
 			};
 
-			Vertex.Color = { 1.0f, 1.0f, 1.0f };
-
-			Vertex.TexCoord =
+			if (Attrib.colors.size() != 0)
 			{
-				Attrib.texcoords[2 * Index.texcoord_index + 0],
-				Attrib.texcoords[2 * Index.texcoord_index + 1]
-			};
+				Vertex.Color =
+				{
+					Attrib.colors[3 * Index.vertex_index + 0],
+					Attrib.colors[3 * Index.vertex_index + 1],
+					Attrib.colors[3 * Index.vertex_index + 2]
+				};
+			}
+			else
+			{
+				Vertex.Color = { 1.0f, 1.0f, 1.0f };
+			}
+
+			if (Attrib.normals.size() != 0)
+			{
+				Vertex.Normal =
+				{
+					Attrib.normals[3 * Index.normal_index + 0],
+					Attrib.normals[3 * Index.normal_index + 1],
+					Attrib.normals[3 * Index.normal_index + 2]
+				};
+			}
+
+			if (Attrib.texcoords.size() != 0)
+			{
+				Vertex.TexCoord =
+				{
+					Attrib.texcoords[2 * Index.texcoord_index + 0],
+					Attrib.texcoords[2 * Index.texcoord_index + 1]
+				};
+			}
 
 			/**
 			 * The problem is that the origin of texture coordinates in Vulkan is the top-left corner, 
@@ -1205,12 +1257,12 @@ void App::LoadObjModel()
 	vkFreeMemory(m_Device, StagingBufferMemory, nullptr);
 }
 
-/** Vulkan Init */void App::CreateUniformBuffer()
+/** Vulkan Init */void App::CreateMvpUniformBuffer()
 {
-	VkDeviceSize BufferSize = sizeof(UniformBufferObject);
+	VkDeviceSize BufferSize = sizeof(MvpUniformBufferObject);
 
-	m_UniformBuffers.resize(m_SwapChainImages.size());
-	m_UniformBufferMemories.resize(m_SwapChainImages.size());
+	m_MvpUniformBuffers.resize(m_SwapChainImages.size());
+	m_MvpUniformBufferMemories.resize(m_SwapChainImages.size());
 
 	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 	{
@@ -1219,21 +1271,44 @@ void App::LoadObjModel()
 			BufferSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			m_UniformBuffers[i],
-			m_UniformBufferMemories[i]
+			m_MvpUniformBuffers[i],
+			m_MvpUniformBufferMemories[i]
+		);
+	}
+}
+
+/** Vulkan Init */void App::CreateLightUniformBuffer()
+{
+	VkDeviceSize BufferSize = sizeof(LightUniformBufferObject);
+
+	m_LightUniformBuffers.resize(m_SwapChainImages.size());
+	m_LightUniformBufferMemories.resize(m_SwapChainImages.size());
+
+	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	{
+		CreateBuffer(
+			m_Device,
+			BufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			m_LightUniformBuffers[i],
+			m_LightUniformBufferMemories[i]
 		);
 	}
 }
 
 /** Vulkan Init */void App::CreateDescriptorPool()
 {
-	std::array<VkDescriptorPoolSize, 2> PoolSizes = {};
+	std::array<VkDescriptorPoolSize, 3> PoolSizes = {};
 	
 	PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	PoolSizes[0].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
 	
-	PoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	PoolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	PoolSizes[1].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+
+	PoolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	PoolSizes[2].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
 
 	VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 	PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1264,17 +1339,22 @@ void App::LoadObjModel()
 
 	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 	{
-		VkDescriptorBufferInfo BufferInfo = {};
-		BufferInfo.buffer = m_UniformBuffers[i];
-		BufferInfo.offset = 0;
-		BufferInfo.range = sizeof(UniformBufferObject);
+		VkDescriptorBufferInfo MvpBufferInfo = {};
+		MvpBufferInfo.buffer = m_MvpUniformBuffers[i];
+		MvpBufferInfo.offset = 0;
+		MvpBufferInfo.range = sizeof(MvpUniformBufferObject);
+
+		VkDescriptorBufferInfo LightBufferInfo = {};
+		LightBufferInfo.buffer = m_LightUniformBuffers[i];
+		LightBufferInfo.offset = 0;
+		LightBufferInfo.range = sizeof(LightUniformBufferObject);
 
 		VkDescriptorImageInfo ImageInfo = {};
 		ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		ImageInfo.imageView = m_TextureImageView;
 		ImageInfo.sampler = m_TextureSamler;
 
-		std::array<VkWriteDescriptorSet, 2> DescriptorWrites = {};
+		std::array<VkWriteDescriptorSet, 3> DescriptorWrites = {};
 		
 		DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		DescriptorWrites[0].dstSet = m_DescriptorSets[i];
@@ -1282,7 +1362,7 @@ void App::LoadObjModel()
 		DescriptorWrites[0].dstArrayElement = 0;
 		DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		DescriptorWrites[0].descriptorCount = 1;
-		DescriptorWrites[0].pBufferInfo = &BufferInfo;
+		DescriptorWrites[0].pBufferInfo = &MvpBufferInfo;
 		DescriptorWrites[0].pImageInfo = nullptr;
 		DescriptorWrites[0].pTexelBufferView = nullptr;
 
@@ -1290,11 +1370,21 @@ void App::LoadObjModel()
 		DescriptorWrites[1].dstSet = m_DescriptorSets[i];
 		DescriptorWrites[1].dstBinding = 1;
 		DescriptorWrites[1].dstArrayElement = 0;
-		DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		DescriptorWrites[1].descriptorCount = 1;
-		DescriptorWrites[1].pBufferInfo = nullptr;
-		DescriptorWrites[1].pImageInfo = &ImageInfo;
+		DescriptorWrites[1].pBufferInfo = &LightBufferInfo;
+		DescriptorWrites[1].pImageInfo = nullptr;
 		DescriptorWrites[1].pTexelBufferView = nullptr;
+
+		DescriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrites[2].dstSet = m_DescriptorSets[i];
+		DescriptorWrites[2].dstBinding = 2;
+		DescriptorWrites[2].dstArrayElement = 0;
+		DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[2].descriptorCount = 1;
+		DescriptorWrites[2].pBufferInfo = nullptr;
+		DescriptorWrites[2].pImageInfo = &ImageInfo;
+		DescriptorWrites[2].pTexelBufferView = nullptr;
 
 		vkUpdateDescriptorSets(
 			m_Device, 

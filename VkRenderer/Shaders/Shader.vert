@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(binding = 0) uniform UniformBufferObject
+layout(binding = 0) uniform MvpUniformBufferObject
 {
     mat4 Model;
     mat4 View;
@@ -13,14 +13,20 @@ layout(location = 1) in vec3 Color;
 layout(location = 2) in vec3 Normal;
 layout(location = 3) in vec2 TexCoord;
 
-layout(location = 0) out vec3 FragColor;
-layout(location = 1) out vec3 FragNormal;
-layout(location = 2) out vec2 FragTexCoord;
+layout(location = 0) out vec4 FragPosition;
+layout(location = 1) out vec3 FragColor;
+layout(location = 2) out vec3 FragNormal;
+layout(location = 3) out vec2 FragTexCoord;
+layout(location = 4) out vec3 FragPositionW;
 
 void main()
 {
-    gl_Position = Transformation.Projection * Transformation.View * Transformation.Model * vec4(Position, 1.0);
+    FragPosition = Transformation.Projection * Transformation.View * Transformation.Model * vec4(Position, 1.0);
     FragColor = Color;
     FragNormal = Normal;
     FragTexCoord = TexCoord;
+    FragPositionW = (Transformation.Model * vec4(Position, 1.0)).xyz;
+
+    gl_Position = FragPosition;
 }
+

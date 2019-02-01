@@ -91,7 +91,9 @@ protected:
 
 	/** Vulkan Init */void CreateIndexBuffer();
 
-	/** Vulkan Init */void CreateUniformBuffer();
+	/** Vulkan Init */void CreateMvpUniformBuffer();
+
+	/** Vulkan Init */void CreateLightUniformBuffer();
 
 	/** Vulkan Init */void CreateDescriptorPool();
 
@@ -383,16 +385,24 @@ protected: /** Mesh */
 	VkDeviceMemory m_IndexBufferMemory = VK_NULL_HANDLE;
 
 protected: /** UBO */
-	struct UniformBufferObject
+	struct MvpUniformBufferObject
 	{
-		glm::mat4 Model;
-		glm::mat4 View;
-		glm::mat4 Projection;
+		alignas(16) glm::mat4 Model;
+		alignas(16) glm::mat4 View;
+		alignas(16) glm::mat4 Projection;
+	};
+
+	struct LightUniformBufferObject 
+	{
+		alignas(16) glm::vec3 LightPosition;
+		alignas(16) glm::vec3 LightColor;
 	};
 
 	VkDescriptorSetLayout m_DescriptorSetLayout = VK_NULL_HANDLE;
-	std::vector<VkBuffer> m_UniformBuffers;
-	std::vector<VkDeviceMemory> m_UniformBufferMemories;
+	std::vector<VkBuffer> m_MvpUniformBuffers;
+	std::vector<VkDeviceMemory> m_MvpUniformBufferMemories;
+	std::vector<VkBuffer> m_LightUniformBuffers;
+	std::vector<VkDeviceMemory> m_LightUniformBufferMemories;
 	VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
 	/** Descriptor sets will be automatically freed when the descriptor pool is destroyed. */
 	std::vector<VkDescriptorSet> m_DescriptorSets;
