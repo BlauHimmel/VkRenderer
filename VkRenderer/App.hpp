@@ -267,7 +267,7 @@ protected:
 		VkDebugUtilsMessengerEXT * pDebugMessenger
 	);
 
-	/** Loader */static VkResult vkDestroyDebugUtilsMessengerEXT(
+	/** Loader */static void vkDestroyDebugUtilsMessengerEXT(
 		VkInstance Instance,
 		VkDebugUtilsMessengerEXT DebugMessenger,
 		const VkAllocationCallbacks * pAllocator

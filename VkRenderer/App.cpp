@@ -2040,13 +2040,11 @@ void App::LoadObjModel(bool bDuplicatedVertexOptimization)
 	{
 		return Func(Instance, pCreateInfo, pAllocator, pDebugMessenger);
 	}
-	else
-	{
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-	}
+	
+	throw std::runtime_error("Function vkCreateDebugUtilsMessengerEXT not found!");
 }
 
-/** Loader */VkResult App::vkDestroyDebugUtilsMessengerEXT(
+/** Loader */void App::vkDestroyDebugUtilsMessengerEXT(
 	VkInstance Instance,
 	VkDebugUtilsMessengerEXT DebugMessenger,
 	const VkAllocationCallbacks * pAllocator
@@ -2057,10 +2055,8 @@ void App::LoadObjModel(bool bDuplicatedVertexOptimization)
 	{
 		Func(Instance, DebugMessenger, pAllocator);
 	}
-	else
-	{
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-	}
+
+	throw std::runtime_error("Function vkCreateDebugUtilsMessengerEXT not found!");
 }
 
 /** Helper */std::vector<char> App::ReadFile(
