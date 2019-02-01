@@ -1,0 +1,3 @@
+call CompileVertexShader.bat
+call CompileFragmentShader.bat
+pause

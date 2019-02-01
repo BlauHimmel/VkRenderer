@@ -614,6 +614,7 @@ void App::Run()
 			m_Device, 
 			m_SwapChainImages[i], 
 			m_SwapChainImageFormat, 
+			1,
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			m_SwapChainImageViews[i]
 		);
@@ -930,6 +931,7 @@ void App::Run()
 		m_Device,
 		m_SwapChainExtent.width,
 		m_SwapChainExtent.height,
+		1,
 		DepthFormat,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -942,6 +944,7 @@ void App::Run()
 		m_Device,
 		m_DepthImage,
 		DepthFormat,
+		1,
 		VK_IMAGE_ASPECT_DEPTH_BIT,
 		m_DepthImageView
 	);
@@ -952,6 +955,7 @@ void App::Run()
 		m_CommandPool,
 		m_DepthImage,
 		DepthFormat,
+		1,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 	);
@@ -996,6 +1000,9 @@ void App::Run()
 		STBI_rgb_alpha
 	);
 	VkDeviceSize ImageSize = TexWidth * TexHeight * 4;
+	m_MipLevels = static_cast<uint32_t>(
+		std::floor(std::log2(std::max(TexWidth, TexHeight)))
+	) + 1;
 
 	if (pPixels == nullptr)
 	{
@@ -1025,9 +1032,12 @@ void App::Run()
 		m_Device,
 		static_cast<uint32_t>(TexWidth),
 		static_cast<uint32_t>(TexHeight),
+		m_MipLevels,
 		VK_FORMAT_R8G8B8A8_UNORM,
 		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT | 
+		VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		m_TextureImage,
 		m_TextureImageMemory
@@ -1039,6 +1049,7 @@ void App::Run()
 		m_CommandPool,
 		m_TextureImage,
 		VK_FORMAT_R8G8B8A8_UNORM,
+		m_MipLevels,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
 	);
@@ -1053,14 +1064,16 @@ void App::Run()
 		static_cast<uint32_t>(TexHeight)
 	);
 
-	TransitionImageLayout(
+	GenerateMipmaps(
+		m_PhysicalDevice,
 		m_Device,
-		m_GraphicsQueue,
 		m_CommandPool,
+		m_GraphicsQueue,
 		m_TextureImage,
 		VK_FORMAT_R8G8B8A8_UNORM,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		TexWidth,
+		TexHeight,
+		m_MipLevels
 	);
 
 	vkDestroyBuffer(m_Device, StagingBuffer, nullptr);
@@ -1073,6 +1086,7 @@ void App::Run()
 		m_Device, 
 		m_TextureImage, 
 		VK_FORMAT_R8G8B8A8_UNORM,
+		m_MipLevels,
 		VK_IMAGE_ASPECT_COLOR_BIT,
 		m_TextureImageView
 	);
@@ -1096,7 +1110,7 @@ void App::Run()
 	CreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	CreateInfo.mipLodBias = 0.0f;
 	CreateInfo.minLod = 0.0f;
-	CreateInfo.maxLod = 0.0f;
+	CreateInfo.maxLod = static_cast<float>(m_MipLevels);
 
 	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_TextureSamler) != VK_SUCCESS)
 	{
@@ -1724,6 +1738,7 @@ void App::LoadObjModel()
 	VkDevice Device,
 	VkImage Image,
 	VkFormat Format,
+	uint32_t MipLevels,
 	VkImageAspectFlags AspectFlags,
 	VkImageView & ImageView
 )
@@ -1735,7 +1750,7 @@ void App::LoadObjModel()
 	CreateInfo.format = Format;
 	CreateInfo.subresourceRange.aspectMask = AspectFlags;
 	CreateInfo.subresourceRange.baseMipLevel = 0;
-	CreateInfo.subresourceRange.levelCount = 1;
+	CreateInfo.subresourceRange.levelCount = MipLevels;
 	CreateInfo.subresourceRange.baseArrayLayer = 0;
 	CreateInfo.subresourceRange.layerCount = 1;
 
@@ -1887,6 +1902,7 @@ void App::LoadObjModel()
 	VkDevice Device,
 	uint32_t Width,
 	uint32_t Height,
+	uint32_t MipLevels,
 	VkFormat Format,
 	VkImageTiling Tiling,
 	VkImageUsageFlags Usage,
@@ -1901,7 +1917,7 @@ void App::LoadObjModel()
 	ImageCreateInfo.extent.width = Width;
 	ImageCreateInfo.extent.height = Height;
 	ImageCreateInfo.extent.depth = 1;
-	ImageCreateInfo.mipLevels = 1;
+	ImageCreateInfo.mipLevels = MipLevels;
 	ImageCreateInfo.arrayLayers = 1;
 	ImageCreateInfo.format = Format;
 	ImageCreateInfo.tiling = Tiling;
@@ -1980,6 +1996,7 @@ void App::LoadObjModel()
 	VkCommandPool CommandPool,
 	VkImage Image,
 	VkFormat Format,
+	uint32_t MipLevels,
 	VkImageLayout OldLayout,
 	VkImageLayout NewLayout
 )
@@ -2008,7 +2025,7 @@ void App::LoadObjModel()
 	}
 
 	Barrier.subresourceRange.baseMipLevel = 0;
-	Barrier.subresourceRange.levelCount = 1;
+	Barrier.subresourceRange.levelCount = MipLevels;
 	Barrier.subresourceRange.baseArrayLayer = 0;
 	Barrier.subresourceRange.layerCount = 1;
 
@@ -2096,6 +2113,144 @@ void App::LoadObjModel()
 	EndSingleTimeCommands(Device, Queue, CommandPool, CommandBuffer);
 }
 
+/** Helper */void App::GenerateMipmaps(
+	VkPhysicalDevice PhysicalDevice,
+	VkDevice Device,
+	VkCommandPool CommandPool,
+	VkQueue Queue, 
+	VkImage Image, 
+	VkFormat Format,
+	uint32_t Width,
+	uint32_t Height,
+	uint32_t MipLevels
+)
+{
+	/** Check if image format supports linear blitting */
+	VkFormatProperties FormatProperties;
+	vkGetPhysicalDeviceFormatProperties(PhysicalDevice, Format, &FormatProperties);
+
+	if (!(FormatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+	{
+		throw std::runtime_error("Texture image format does not support linear blitting!");
+	}
+
+	VkCommandBuffer CommandBuffer = BeginSingleTimeCommands(Device, CommandPool);
+
+	VkImageMemoryBarrier Barrier = {};
+	Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	Barrier.image = Image;
+	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	Barrier.subresourceRange.baseArrayLayer = 0;
+	Barrier.subresourceRange.layerCount = 1;
+	Barrier.subresourceRange.levelCount = 1;
+
+	int32_t MipWidth = Width;
+	int32_t MipHeight = Height;
+
+	for (uint32_t i = 1; i < MipLevels; i++)
+	{
+		Barrier.subresourceRange.baseMipLevel = i - 1;
+		Barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		Barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		Barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+		vkCmdPipelineBarrier(
+			CommandBuffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			0,
+			0,
+			nullptr,
+			0,
+			nullptr,
+			1,
+			&Barrier
+		);
+
+		VkImageBlit Blit = {};
+		Blit.srcOffsets[0] = { 0, 0, 0 };
+		Blit.srcOffsets[1] = { MipWidth, MipHeight, 1 };
+		Blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		Blit.srcSubresource.mipLevel = i - 1;
+		Blit.srcSubresource.baseArrayLayer = 0;
+		Blit.srcSubresource.layerCount = 1;
+		Blit.dstOffsets[0] = { 0, 0, 0 };
+		Blit.dstOffsets[1] =
+		{
+			MipWidth > 1 ? MipWidth / 2 : 1,
+			MipHeight > 1 ? MipHeight / 2 : 1,
+			1
+		};
+		Blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		Blit.dstSubresource.mipLevel = i;
+		Blit.dstSubresource.baseArrayLayer = 0;
+		Blit.dstSubresource.layerCount = 1;
+
+		vkCmdBlitImage(
+			CommandBuffer,
+			Image,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			Image,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1,
+			&Blit,
+			VK_FILTER_LINEAR
+		);
+
+		Barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		Barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		vkCmdPipelineBarrier(
+			CommandBuffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0,
+			0,
+			nullptr,
+			0,
+			nullptr,
+			1,
+			&Barrier
+		);
+
+		if (MipWidth > 1)
+		{
+			MipWidth /= 2;
+		}
+
+		if (MipHeight > 1) 
+		{
+			MipHeight /= 2; 
+		}
+	}
+
+	Barrier.subresourceRange.baseMipLevel = MipLevels - 1;
+	Barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	Barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	vkCmdPipelineBarrier(
+		CommandBuffer,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0,
+		0,
+		nullptr,
+		0,
+		nullptr,
+		1,
+		&Barrier
+	);
+
+	EndSingleTimeCommands(Device, Queue, CommandPool, CommandBuffer);
+}
+
 /** Callback */VKAPI_ATTR VkBool32 VKAPI_CALL App::DebugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT MessageType,
@@ -2148,7 +2303,7 @@ void App::LoadObjModel()
 		Func(Instance, DebugMessenger, pAllocator);
 	}
 
-	throw std::runtime_error("Function vkCreateDebugUtilsMessengerEXT not found!");
+	throw std::runtime_error("Function vkDestroyDebugUtilsMessengerEXT not found!");
 }
 
 /** Helper */std::vector<char> App::ReadFile(

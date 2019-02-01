@@ -159,6 +159,7 @@ protected:
 		VkDevice Device,
 		VkImage Image,
 		VkFormat Format,
+		uint32_t MipLevels,
 		VkImageAspectFlags AspectFlags,
 		VkImageView & ImageView
 	);
@@ -208,6 +209,7 @@ protected:
 		VkDevice Device,
 		uint32_t Width,
 		uint32_t Height,
+		uint32_t MipLevels,
 		VkFormat Format,
 		VkImageTiling Tiling,
 		VkImageUsageFlags Usage,
@@ -234,6 +236,7 @@ protected:
 		VkCommandPool CommandPool,
 		VkImage Image,
 		VkFormat Format,
+		uint32_t MipLevels,
 		VkImageLayout OldLayout,
 		VkImageLayout NewLayout
 	);
@@ -246,6 +249,18 @@ protected:
 		VkImage DstImage,
 		uint32_t Width,
 		uint32_t Height
+	);
+
+	/** Helper */void GenerateMipmaps(
+		VkPhysicalDevice PhysicalDevice,
+		VkDevice Device,
+		VkCommandPool CommandPool,
+		VkQueue Queue,
+		VkImage Image,
+		VkFormat Format,
+		uint32_t Width,
+		uint32_t Height,
+		uint32_t MipLevels
 	);
 
 protected:
@@ -409,6 +424,7 @@ protected: /** UBO */
 
 protected: /** Texture */
 	const std::string m_TexturePath = "Textures/chalet.jpg";
+	uint32_t m_MipLevels = 0;
 	VkImage m_TextureImage = VK_NULL_HANDLE;
 	VkDeviceMemory m_TextureImageMemory = VK_NULL_HANDLE;
 	VkImageView m_TextureImageView = VK_NULL_HANDLE;
