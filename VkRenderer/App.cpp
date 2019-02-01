@@ -41,6 +41,7 @@ void App::Run()
 
 	glfwSetWindowUserPointer(m_pWindow, this);
 	glfwSetFramebufferSizeCallback(m_pWindow, FramebufferResizeCallback);
+	glfwSetMouseButtonCallback(m_pWindow, MouseButtonCallback);
 }
 
 /** App */void App::InitVulkan()
@@ -292,16 +293,12 @@ void App::Run()
 		DeltaTime * glm::radians(90.0f), 
 		glm::vec3(0.0f, 0.0f, 1.0f)
 	);
-	Transformation.View = glm::lookAt(
-		glm::vec3(2.0f, 2.0f, 2.0f), 
-		glm::vec3(0.0f, 0.0f, 0.0f), 
-		glm::vec3(0.0f, 0.0f, 1.0f)
-	);
+	Transformation.View = glm::lookAt(m_Eye, m_Target, m_Up);
 	Transformation.Projection = glm::perspective(
-		glm::radians(45.0f), 
+		m_Fov,
 		static_cast<float>(m_SwapChainExtent.width) / static_cast<float>(m_SwapChainExtent.height), 
-		0.1f, 
-		10.0f
+		m_NearZ, 
+		m_FarZ
 	);
 	/** GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted */
 	Transformation.Projection[1][1] *= -1.0f;
@@ -828,7 +825,7 @@ void App::Run()
 	RasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
 	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 	RasterizationStateCreateInfo.lineWidth = 1.0f;
-	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
 	RasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	RasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
 	RasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
@@ -2371,6 +2368,27 @@ void App::LoadObjModel()
 	if (pApp != nullptr)
 	{
 		pApp->m_bFramebufferResized = true;
+	}
+}
+
+/** Callback */void App::MouseButtonCallback(
+	GLFWwindow * pWindow, 
+	int Button, 
+	int Action, 
+	int Mods
+)
+{
+	if (Action == GLFW_PRESS)
+	{
+		switch (Button)
+		{
+		case GLFW_MOUSE_BUTTON_LEFT:
+			break;
+		case GLFW_MOUSE_BUTTON_MIDDLE:
+			break;
+		case GLFW_MOUSE_BUTTON_RIGHT:
+			break;
+		}
 	}
 }
 

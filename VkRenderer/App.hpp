@@ -284,6 +284,13 @@ protected:
 		int Height
 	);
 
+	/** Callback */static void MouseButtonCallback(
+		GLFWwindow* pWindow,
+		int Button,
+		int Action,
+		int Mods
+	);
+
 	/** Loader */static VkResult vkCreateDebugUtilsMessengerEXT(
 		VkInstance Instance,
 		const VkDebugUtilsMessengerCreateInfoEXT * pCreateInfo,
@@ -440,5 +447,14 @@ protected: /** Texture */
 	VkImage m_TextureImage = VK_NULL_HANDLE;
 	VkDeviceMemory m_TextureImageMemory = VK_NULL_HANDLE;
 	VkImageView m_TextureImageView = VK_NULL_HANDLE;
-	VkSampler m_TextureSamler = VK_NULL_HANDLE;;
+	VkSampler m_TextureSamler = VK_NULL_HANDLE;
+
+protected: /** Camera */
+	float m_Fov = glm::radians(45.0f);
+	float m_NearZ = 0.1f;
+	float m_FarZ = 10.0f;
+	
+	glm::vec3 m_Target = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 m_Eye = glm::vec3(2.0f, 0.0f, 2.0f);
+	glm::vec3 m_Up = glm::vec3(0.0f, 0.0f, 1.0f);
 };
