@@ -75,6 +75,8 @@ protected:
 	
 	/** Vulkan Init */void CreateCommandPool();
 
+	/** Vulkan Init */void CreateColorResource();
+
 	/** Vulkan Init */void CreateDepthResource();
 
 	/** Vulkan Init */void CreateFramebuffers();
@@ -210,6 +212,7 @@ protected:
 		uint32_t Width,
 		uint32_t Height,
 		uint32_t MipLevels,
+		VkSampleCountFlagBits Samples,
 		VkFormat Format,
 		VkImageTiling Tiling,
 		VkImageUsageFlags Usage,
@@ -261,6 +264,10 @@ protected:
 		uint32_t Width,
 		uint32_t Height,
 		uint32_t MipLevels
+	);
+
+	/** Helper */VkSampleCountFlagBits GetMaxUsableSampleCount(
+		VkPhysicalDevice Device
 	);
 
 protected:
@@ -335,6 +342,11 @@ protected: /** Vulkan pipeline */
 	/** Device queues are implicitly destroyed when the device is destroyed */
 	VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
 	VkQueue m_PresentQueue = VK_NULL_HANDLE;
+
+	VkSampleCountFlagBits m_MsaaSamples = VK_SAMPLE_COUNT_1_BIT;
+	VkImage m_ColorImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_ColorImageMemory = VK_NULL_HANDLE;
+	VkImageView m_ColorImageView = VK_NULL_HANDLE;
 
 	VkSwapchainKHR m_SwapChain = VK_NULL_HANDLE;
 	/** The images were created by the implementation for the swap chain and 
