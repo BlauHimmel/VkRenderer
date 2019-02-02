@@ -136,7 +136,7 @@ void App::Run()
 				m_GpuName.c_str(),
 				static_cast<int32_t>(m_VertexNum), 
 				static_cast<int32_t>(m_FacetNum),
-				m_m_GraphicsPipelinesDescription[m_GraphicsPipelineDisplayMode | m_GraphicsPipelineCullMode],
+				m_GraphicsPipelinesDescription[m_GraphicsPipelineDisplayMode | m_GraphicsPipelineCullMode],
 				static_cast<int32_t>(m_FPS)
 			);
 			glfwSetWindowTitle(m_pWindow, Buffer);

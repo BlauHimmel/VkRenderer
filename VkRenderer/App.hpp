@@ -65,7 +65,7 @@ protected:
 	/** Destroy the objects that are to be recreated in the RecreateSwapChain(). Called when resizing. */
 	/** App Helper */void DestroySwapChainAndRelevantObject();
 
-	/** Recreate the drawing command buffer. Called when display mode(fill, wireframe or point) changed. */
+	/** Recreate the drawing command buffer. Called when display mode or cull mode is changed. */
 	/** App Helper */void RecreateDrawingCommandBuffer();
 
 protected:
@@ -413,7 +413,7 @@ protected: /** Vulkan pipeline */
 		GRAPHICS_PIPELINE_TYPE_NONE_CULL  = 0b100000,
 	};
 
-	std::unordered_map<int, const char *> m_m_GraphicsPipelinesDescription =
+	std::unordered_map<int, const char *> m_GraphicsPipelinesDescription =
 	{
 		{ GRAPHICS_PIPELINE_TYPE_FILL | GRAPHICS_PIPELINE_TYPE_FRONT_CULL, "Fill & Front cull" },
 		{ GRAPHICS_PIPELINE_TYPE_WIREFRAME | GRAPHICS_PIPELINE_TYPE_FRONT_CULL, "Wireframe & Front cull" },
