@@ -24,6 +24,7 @@
 #include <vector>
 #include <array>
 #include <optional>
+#include <unordered_map>
 
 #include "Camera.hpp"
 
@@ -57,11 +58,14 @@ protected:
 		uint32_t CurrentImage
 	);
 
-	/** Recreate the swapchain and all the objects depend on it. */
+	/** Recreate the swapchain and all the objects depend on it. Called when resizing. */
 	/** App Helper */void RecreateSwapChainAndRelevantObject();
 
-	/** Destroy the objects that are to be recreated in the RecreateSwapChain(). */
+	/** Destroy the objects that are to be recreated in the RecreateSwapChain(). Called when resizing. */
 	/** App Helper */void DestroySwapChainAndRelevantObject();
+
+	/** Recreate the drawing command buffer. Called when display mode(fill, wireframe or point) changed. */
+	/** App Helper */void RecreateDrawingCommandBuffer();
 
 protected:
 	/** Vulkan Init */void CreateInstance();
@@ -112,7 +116,7 @@ protected:
 
 	/** Vulkan Init */void CreateDescriptorSets();
 
-	/** Vulkan Init */void CreateCommandBuffers();
+	/** Vulkan Init */void CreateDrawingCommandBuffers();
 
 	/** Vulkan Init */void CreateSyncObjects();
 
@@ -397,7 +401,35 @@ protected: /** Vulkan pipeline */
 
 	VkRenderPass m_RenderPass = VK_NULL_HANDLE;
 	VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
-	VkPipeline m_GraphicsPipeline = VK_NULL_HANDLE;
+
+	enum GRAPHICS_PIPELINE_TYPE
+	{
+		GRAPHICS_PIPELINE_TYPE_FILL       = 0b1,
+		GRAPHICS_PIPELINE_TYPE_WIREFRAME  = 0b10,
+		GRAPHICS_PIPELINE_TYPE_POINT      = 0b100,
+		GRAPHICS_PIPELINE_TYPE_FRONT_CULL = 0b1000,
+		GRAPHICS_PIPELINE_TYPE_BACK_CULL  = 0b10000,
+		GRAPHICS_PIPELINE_TYPE_NONE_CULL  = 0b100000,
+	};
+
+	std::unordered_map<int, const char *> m_m_GraphicsPipelinesDescription =
+	{
+		{ GRAPHICS_PIPELINE_TYPE_FILL | GRAPHICS_PIPELINE_TYPE_FRONT_CULL, "Fill & Front cull" },
+		{ GRAPHICS_PIPELINE_TYPE_WIREFRAME | GRAPHICS_PIPELINE_TYPE_FRONT_CULL, "Wireframe & Front cull" },
+		{ GRAPHICS_PIPELINE_TYPE_POINT | GRAPHICS_PIPELINE_TYPE_FRONT_CULL, "Point & Front cull" },
+
+		{ GRAPHICS_PIPELINE_TYPE_FILL | GRAPHICS_PIPELINE_TYPE_BACK_CULL, "Fill & Back cull" },
+		{ GRAPHICS_PIPELINE_TYPE_WIREFRAME | GRAPHICS_PIPELINE_TYPE_BACK_CULL, "Wireframe & Back cull" },
+		{ GRAPHICS_PIPELINE_TYPE_POINT | GRAPHICS_PIPELINE_TYPE_BACK_CULL, "Point & Back cull" },
+
+		{ GRAPHICS_PIPELINE_TYPE_FILL | GRAPHICS_PIPELINE_TYPE_NONE_CULL, "Fill & None cull" },
+		{ GRAPHICS_PIPELINE_TYPE_WIREFRAME | GRAPHICS_PIPELINE_TYPE_NONE_CULL, "Wireframe & None cull" },
+		{ GRAPHICS_PIPELINE_TYPE_POINT | GRAPHICS_PIPELINE_TYPE_NONE_CULL, "Point & None cull" }
+	};
+
+	std::unordered_map<int, VkPipeline> m_GraphicsPipelines;
+	int m_GraphicsPipelineDisplayMode = GRAPHICS_PIPELINE_TYPE_FILL;
+	int m_GraphicsPipelineCullMode = GRAPHICS_PIPELINE_TYPE_NONE_CULL;
 
 	VkImage m_DepthImage = VK_NULL_HANDLE;
 	VkDeviceMemory m_DepthImageMemory = VK_NULL_HANDLE;
@@ -407,7 +439,7 @@ protected: /** Vulkan pipeline */
 
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 	/** Command buffers will be automatically freed when their command pool is destroyed. */
-	std::vector<VkCommandBuffer> m_CommandBuffers;
+	std::vector<VkCommandBuffer> m_DrawingCommandBuffers;
 
 	const int m_MaxFramesInFlights = 2;
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores;

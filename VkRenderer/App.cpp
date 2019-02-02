@@ -21,7 +21,6 @@
 #include <cstring>
 #include <exception>
 #include <stdexcept>
-#include <unordered_map>
 
 namespace VkRenderer
 {
@@ -100,7 +99,7 @@ void App::Run()
 
 	CreateDescriptorSets();
 
-	CreateCommandBuffers();
+	CreateDrawingCommandBuffers();
 
 	CreateSyncObjects();
 }
@@ -132,11 +131,12 @@ void App::Run()
 
 			char Buffer[256];
 			sprintf_s(
-				Buffer, "%s [%s] [Vertex : %d Facet : %d] Fps: %d", 
+				Buffer, "%s [%s] [Vertex : %d Facet : %d] [%s] Fps: %d", 
 				m_Title.c_str(), 
 				m_GpuName.c_str(),
 				static_cast<int32_t>(m_VertexNum), 
 				static_cast<int32_t>(m_FacetNum),
+				m_m_GraphicsPipelinesDescription[m_GraphicsPipelineDisplayMode | m_GraphicsPipelineCullMode],
 				static_cast<int32_t>(m_FPS)
 			);
 			glfwSetWindowTitle(m_pWindow, Buffer);
@@ -186,7 +186,7 @@ void App::Run()
 	SubmitInfo.pWaitSemaphores = WaitSemaphores;
 	SubmitInfo.pWaitDstStageMask = WaitStages;
 	SubmitInfo.commandBufferCount = 1;
-	SubmitInfo.pCommandBuffers = &m_CommandBuffers[ImageIndex];
+	SubmitInfo.pCommandBuffers = &m_DrawingCommandBuffers[ImageIndex];
 
 	VkSemaphore SignalSemaphores[] = { m_RenderFinishedSemaphores[m_CurrentFrame] };
 	SubmitInfo.signalSemaphoreCount = 1;
@@ -354,7 +354,7 @@ void App::Run()
 
 	CreateFramebuffers();
 
-	CreateCommandBuffers();
+	CreateDrawingCommandBuffers();
 }
 
 /** App Helper */void App::DestroySwapChainAndRelevantObject()
@@ -372,7 +372,10 @@ void App::Run()
 		vkDestroyFramebuffer(m_Device, Framebuffer, nullptr);
 	}
 
-	vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
+	for (auto & Kv : m_GraphicsPipelines)
+	{
+		vkDestroyPipeline(m_Device, Kv.second, nullptr);
+	}
 
 	vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
 
@@ -388,9 +391,21 @@ void App::Run()
 	vkFreeCommandBuffers(
 		m_Device, 
 		m_CommandPool, 
-		static_cast<uint32_t>(m_CommandBuffers.size()), 
-		m_CommandBuffers.data()
+		static_cast<uint32_t>(m_DrawingCommandBuffers.size()), 
+		m_DrawingCommandBuffers.data()
 	);
+}
+
+void App::RecreateDrawingCommandBuffer()
+{
+	vkFreeCommandBuffers(
+		m_Device,
+		m_CommandPool,
+		static_cast<uint32_t>(m_DrawingCommandBuffers.size()),
+		m_DrawingCommandBuffers.data()
+	);
+
+	CreateDrawingCommandBuffers();
 }
 
 /** Vulkan Init */void App::CreateInstance()
@@ -544,6 +559,7 @@ void App::Run()
 	VkPhysicalDeviceFeatures DeviceFeatures = {};
 	DeviceFeatures.samplerAnisotropy = VK_TRUE;
 	DeviceFeatures.sampleRateShading = VK_TRUE;
+	DeviceFeatures.fillModeNonSolid = VK_TRUE;
 
 	VkDeviceCreateInfo CreateInfo = {};
 	CreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -774,7 +790,6 @@ void App::Run()
 	{
 		throw std::runtime_error("Failed to create descriptor set layout!");
 	}
-
 }
 
 /** Vulkan Init */void App::CreateGraphicsPipeline()
@@ -922,6 +937,7 @@ void App::Run()
 
 	VkGraphicsPipelineCreateInfo GraphicsPipelineCreateInfo = {};
 	GraphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	GraphicsPipelineCreateInfo.flags = VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
 	GraphicsPipelineCreateInfo.stageCount = 2;
 	GraphicsPipelineCreateInfo.pStages = ShaderStageCreateInfos;
 	GraphicsPipelineCreateInfo.pVertexInputState = &VertexInputStateCreateInfo;
@@ -938,17 +954,149 @@ void App::Run()
 	GraphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
 	GraphicsPipelineCreateInfo.basePipelineIndex = -1;
 
+	/** GRAPHICS_PIPELINE_TYPE_FILL & GRAPHICS_PIPELINE_TYPE_FRONT_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
 	if (vkCreateGraphicsPipelines(
 		m_Device,
 		VK_NULL_HANDLE, 
 		1, 
 		&GraphicsPipelineCreateInfo,
 		nullptr, 
-		&m_GraphicsPipeline
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_FILL | GRAPHICS_PIPELINE_TYPE_FRONT_CULL]
 	) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create graphics pipeline!");
 	}
+	/************************************************************************/
+
+	/** GRAPHICS_PIPELINE_TYPE_WIREFRAME & GRAPHICS_PIPELINE_TYPE_FRONT_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_LINE;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+	if (vkCreateGraphicsPipelines(
+		m_Device,
+		VK_NULL_HANDLE,
+		1,
+		&GraphicsPipelineCreateInfo,
+		nullptr,
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_WIREFRAME | GRAPHICS_PIPELINE_TYPE_FRONT_CULL]
+	) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
+	/************************************************************************/
+
+	/** GRAPHICS_PIPELINE_TYPE_POINT & GRAPHICS_PIPELINE_TYPE_FRONT_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_POINT;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+	if (vkCreateGraphicsPipelines(
+		m_Device,
+		VK_NULL_HANDLE,
+		1,
+		&GraphicsPipelineCreateInfo,
+		nullptr,
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_POINT | GRAPHICS_PIPELINE_TYPE_FRONT_CULL]
+	) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
+	/************************************************************************/
+	
+	/** GRAPHICS_PIPELINE_TYPE_FILL & GRAPHICS_PIPELINE_TYPE_BACK_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	if (vkCreateGraphicsPipelines(
+		m_Device,
+		VK_NULL_HANDLE,
+		1,
+		&GraphicsPipelineCreateInfo,
+		nullptr,
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_FILL | GRAPHICS_PIPELINE_TYPE_BACK_CULL]
+	) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
+	/************************************************************************/
+	
+	/** GRAPHICS_PIPELINE_TYPE_WIREFRAME & GRAPHICS_PIPELINE_TYPE_BACK_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_LINE;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	if (vkCreateGraphicsPipelines(
+		m_Device,
+		VK_NULL_HANDLE,
+		1,
+		&GraphicsPipelineCreateInfo,
+		nullptr,
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_WIREFRAME | GRAPHICS_PIPELINE_TYPE_BACK_CULL]
+	) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
+	/************************************************************************/
+	
+	/** GRAPHICS_PIPELINE_TYPE_POINT & GRAPHICS_PIPELINE_TYPE_BACK_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_POINT;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	if (vkCreateGraphicsPipelines(
+		m_Device,
+		VK_NULL_HANDLE,
+		1,
+		&GraphicsPipelineCreateInfo,
+		nullptr,
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_POINT | GRAPHICS_PIPELINE_TYPE_BACK_CULL]
+	) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
+	/************************************************************************/
+	
+	/** GRAPHICS_PIPELINE_TYPE_FILL & GRAPHICS_PIPELINE_TYPE_NONE_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	if (vkCreateGraphicsPipelines(
+		m_Device,
+		VK_NULL_HANDLE,
+		1,
+		&GraphicsPipelineCreateInfo,
+		nullptr,
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_FILL | GRAPHICS_PIPELINE_TYPE_NONE_CULL]
+	) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
+	/************************************************************************/
+	
+	/** GRAPHICS_PIPELINE_TYPE_WIREFRAME & GRAPHICS_PIPELINE_TYPE_NONE_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_LINE;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	if (vkCreateGraphicsPipelines(
+		m_Device,
+		VK_NULL_HANDLE,
+		1,
+		&GraphicsPipelineCreateInfo,
+		nullptr,
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_WIREFRAME | GRAPHICS_PIPELINE_TYPE_NONE_CULL]
+	) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
+	/************************************************************************/
+	
+	/** GRAPHICS_PIPELINE_TYPE_POINT & GRAPHICS_PIPELINE_TYPE_NONE_CULL */
+	RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_POINT;
+	RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	if (vkCreateGraphicsPipelines(
+		m_Device,
+		VK_NULL_HANDLE,
+		1,
+		&GraphicsPipelineCreateInfo,
+		nullptr,
+		&m_GraphicsPipelines[GRAPHICS_PIPELINE_TYPE_POINT | GRAPHICS_PIPELINE_TYPE_NONE_CULL]
+	) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
+	/************************************************************************/
 
 	vkDestroyShaderModule(m_Device, VertShaderModule, nullptr);
 	vkDestroyShaderModule(m_Device, FragShaderModule, nullptr);
@@ -1497,29 +1645,29 @@ void App::LoadObjModel()
 	}
 }
 
-/** Vulkan Init */void App::CreateCommandBuffers()
+/** Vulkan Init */void App::CreateDrawingCommandBuffers()
 {
-	m_CommandBuffers.resize(m_SwapChainFramebuffers.size());
+	m_DrawingCommandBuffers.resize(m_SwapChainFramebuffers.size());
 
 	VkCommandBufferAllocateInfo CmdBufferAllocInfo = {};
 	CmdBufferAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	CmdBufferAllocInfo.commandPool = m_CommandPool;
 	CmdBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	CmdBufferAllocInfo.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size());
+	CmdBufferAllocInfo.commandBufferCount = static_cast<uint32_t>(m_DrawingCommandBuffers.size());
 
-	if (vkAllocateCommandBuffers(m_Device, &CmdBufferAllocInfo, m_CommandBuffers.data()) != VK_SUCCESS)
+	if (vkAllocateCommandBuffers(m_Device, &CmdBufferAllocInfo, m_DrawingCommandBuffers.data()) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to allocate command buffers!");
 	}
 
-	for (size_t i = 0; i < m_CommandBuffers.size(); i++)
+	for (size_t i = 0; i < m_DrawingCommandBuffers.size(); i++)
 	{
 		VkCommandBufferBeginInfo CmdBufferBeginInfo = {};
 		CmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		CmdBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 		CmdBufferBeginInfo.pInheritanceInfo = nullptr;
 
-		if (vkBeginCommandBuffer(m_CommandBuffers[i], &CmdBufferBeginInfo) != VK_SUCCESS)
+		if (vkBeginCommandBuffer(m_DrawingCommandBuffers[i], &CmdBufferBeginInfo) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to begin recording command buffer!");
 		}
@@ -1538,16 +1686,20 @@ void App::LoadObjModel()
 		PassBeginInfo.clearValueCount = static_cast<uint32_t>(ClearColors.size());
 		PassBeginInfo.pClearValues = ClearColors.data();
 
-		vkCmdBeginRenderPass(m_CommandBuffers[i], &PassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		
-		vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
-		
+		vkCmdBeginRenderPass(m_DrawingCommandBuffers[i], &PassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		vkCmdBindPipeline(
+			m_DrawingCommandBuffers[i], 
+			VK_PIPELINE_BIND_POINT_GRAPHICS, 
+			m_GraphicsPipelines[m_GraphicsPipelineDisplayMode | m_GraphicsPipelineCullMode]
+		);
+
 		VkBuffer VertexBuffers[] = { m_VertexBuffer };
 		VkDeviceSize Offsets[] = { 0 };
-		vkCmdBindVertexBuffers(m_CommandBuffers[i], 0, 1, VertexBuffers, Offsets);
-		vkCmdBindIndexBuffer(m_CommandBuffers[i], m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(m_DrawingCommandBuffers[i], 0, 1, VertexBuffers, Offsets);
+		vkCmdBindIndexBuffer(m_DrawingCommandBuffers[i], m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		vkCmdBindDescriptorSets(
-			m_CommandBuffers[i], 
+			m_DrawingCommandBuffers[i], 
 			VK_PIPELINE_BIND_POINT_GRAPHICS, 
 			m_PipelineLayout, 
 			0, 
@@ -1557,11 +1709,11 @@ void App::LoadObjModel()
 			nullptr
 		);
 
-		vkCmdDrawIndexed(m_CommandBuffers[i], static_cast<uint32_t>(m_Indices.size()), 1, 0, 0, 0);
+		vkCmdDrawIndexed(m_DrawingCommandBuffers[i], static_cast<uint32_t>(m_Indices.size()), 1, 0, 0, 0);
 
-		vkCmdEndRenderPass(m_CommandBuffers[i]);
+		vkCmdEndRenderPass(m_DrawingCommandBuffers[i]);
 
-		if (vkEndCommandBuffer(m_CommandBuffers[i]) != VK_SUCCESS)
+		if (vkEndCommandBuffer(m_DrawingCommandBuffers[i]) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to record command buffer!");
 		}
@@ -2455,9 +2607,55 @@ void App::LoadObjModel()
 {
 	App * pApp = reinterpret_cast<App*>(glfwGetWindowUserPointer(pWindow));
 	
+	/** [H] : Reset all the status */
 	if (Key == GLFW_KEY_H && Action == GLFW_RELEASE)
 	{
 		pApp->m_Camera.Reset();
+		pApp->m_GraphicsPipelineDisplayMode = GRAPHICS_PIPELINE_TYPE_FILL;
+		pApp->m_GraphicsPipelineCullMode = GRAPHICS_PIPELINE_TYPE_NONE_CULL;
+		pApp->RecreateDrawingCommandBuffer();
+	}
+
+	/** [D] : Change display mode */
+	if (Key == GLFW_KEY_D && Action == GLFW_RELEASE)
+	{
+		switch (pApp->m_GraphicsPipelineDisplayMode)
+		{
+		case GRAPHICS_PIPELINE_TYPE_FILL:
+			pApp->m_GraphicsPipelineDisplayMode = GRAPHICS_PIPELINE_TYPE_WIREFRAME;
+			break;
+		case GRAPHICS_PIPELINE_TYPE_WIREFRAME:
+			pApp->m_GraphicsPipelineDisplayMode = GRAPHICS_PIPELINE_TYPE_POINT;
+			break;
+		case GRAPHICS_PIPELINE_TYPE_POINT:
+			pApp->m_GraphicsPipelineDisplayMode = GRAPHICS_PIPELINE_TYPE_FILL;
+			break;
+		default:
+			pApp->m_GraphicsPipelineDisplayMode = GRAPHICS_PIPELINE_TYPE_FILL;
+			break;
+		}
+		pApp->RecreateDrawingCommandBuffer();
+	}
+
+	/** [C] : Change cull mode */
+	if (Key == GLFW_KEY_C && Action == GLFW_RELEASE)
+	{
+		switch (pApp->m_GraphicsPipelineCullMode)
+		{
+		case GRAPHICS_PIPELINE_TYPE_NONE_CULL:
+			pApp->m_GraphicsPipelineCullMode = GRAPHICS_PIPELINE_TYPE_FRONT_CULL;
+			break;
+		case GRAPHICS_PIPELINE_TYPE_FRONT_CULL:
+			pApp->m_GraphicsPipelineCullMode = GRAPHICS_PIPELINE_TYPE_BACK_CULL;
+			break;
+		case GRAPHICS_PIPELINE_TYPE_BACK_CULL:
+			pApp->m_GraphicsPipelineCullMode = GRAPHICS_PIPELINE_TYPE_NONE_CULL;
+			break;
+		default:
+			pApp->m_GraphicsPipelineCullMode = GRAPHICS_PIPELINE_TYPE_NONE_CULL;
+			break;
+		}
+		pApp->RecreateDrawingCommandBuffer();
 	}
 }
 
