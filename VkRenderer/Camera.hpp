@@ -5,8 +5,9 @@
 #endif
 #include <glm/glm.hpp>
 
-namespace VkRenderer
-{
+#include "Namespace.hpp"
+
+NAMESPACE_BEGIN(GLOBAL_NAMESPACE)
 
 class Camera
 {
@@ -45,4 +46,4 @@ protected:
 	const float m_TargetSpeed = 0.005f;
 };
 
-} // End namespace
+NAMESPACE_END

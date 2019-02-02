@@ -26,6 +26,7 @@
 #include <optional>
 #include <unordered_map>
 
+#include "Namespace.hpp"
 #include "Camera.hpp"
 
 //TODO :
@@ -38,8 +39,7 @@
 //    7. Implement IBR.
 //    8. Pipeline cached.
 
-namespace VkRenderer
-{
+NAMESPACE_BEGIN(GLOBAL_NAMESPACE)
 
 /** An very simple vulkan application. */
 class App
@@ -122,171 +122,6 @@ protected:
 	/** Vulkan Init */void CreateSyncObjects();
 
 protected:
-	/** Helper Struct */struct QueueFamilyIndices
-	{
-		std::optional<uint32_t> GraphicsFamily;
-		std::optional<uint32_t> PresentFamily;
-
-		bool IsComplete() const;
-	};
-
-	/** Helper Struct */struct SwapChainSupportDetails
-	{
-		VkSurfaceCapabilitiesKHR Capabilities;
-		std::vector<VkSurfaceFormatKHR> Formats;
-		std::vector<VkPresentModeKHR> PresentModes;
-	};
-
-protected:
-	/** Helper */bool CheckValidationLayerSupport() const;
-
-	/** Helper */std::vector<const char *> GetRequiredExtensions() const;
-
-	/** Helper */bool IsPhysicalDeviceSuitable(
-		VkPhysicalDevice Device,
-		VkSurfaceKHR Surface
-	) const;
-
-	/** Helper */QueueFamilyIndices FindQueueFamilies(
-		VkPhysicalDevice Device
-	) const;
-
-	/** Helper */bool CheckPhysicalDeviceExtensionsSupport(
-		VkPhysicalDevice Device
-	) const;
-
-	/** Helper */SwapChainSupportDetails QuerySwapChainSupport(
-		VkPhysicalDevice Device,
-		VkSurfaceKHR Surface
-	) const;
-
-	/** Helper */VkSurfaceFormatKHR ChooseSwapSurfaceFormat(
-		const std::vector<VkSurfaceFormatKHR> & AvailableFormats
-	) const;
-
-	/** Helper */VkPresentModeKHR ChooseSwapPresentMode(
-		const std::vector<VkPresentModeKHR> & AvailablePresentModes
-	) const;
-
-	/** Helper */VkExtent2D ChooseSwapExtent(
-		GLFWwindow * pWindow,
-		const VkSurfaceCapabilitiesKHR & Capabilities
-	) const;
-
-	/** Helper */void CreateImageView(
-		VkDevice Device,
-		VkImage Image,
-		VkFormat Format,
-		uint32_t MipLevels,
-		VkImageAspectFlags AspectFlags,
-		VkImageView & ImageView
-	);
-
-	/** Helper */VkShaderModule CreateShaderModule(
-		VkDevice Device,
-		const std::vector<char> & ShaderCode
-	);
-
-	/** Helper */VkFormat FindSupportedFormat(
-		VkPhysicalDevice Device,
-		const std::vector<VkFormat> & Candidates,
-		VkImageTiling Tiling,
-		VkFormatFeatureFlags Features
-	) const;
-
-	/** Helper */VkFormat FindDepthFormat();
-
-	/** Helper */bool HasStencilComponent(
-		VkFormat Format
-	) const;
-
-	/** Helper */uint32_t FindMemoryType(
-		uint32_t TypeFilter,
-		VkMemoryPropertyFlags Properties
-	);
-
-	/** Helper */void CreateBuffer(
-		VkDevice Device,
-		VkDeviceSize Size,
-		VkBufferUsageFlags Usage,
-		VkMemoryPropertyFlags Properties,
-		VkBuffer & Buffer,
-		VkDeviceMemory & BufferMemory
-	);
-
-	/** Helper */void CopyBuffer(
-		VkDevice Device,
-		VkCommandPool CommandPool,
-		VkQueue Queue,
-		VkBuffer SrcBuffer,
-		VkBuffer DstBuffer,
-		VkDeviceSize Size
-	);
-
-	/** Helper */void CreateImage(
-		VkDevice Device,
-		uint32_t Width,
-		uint32_t Height,
-		uint32_t MipLevels,
-		VkSampleCountFlagBits Samples,
-		VkFormat Format,
-		VkImageTiling Tiling,
-		VkImageUsageFlags Usage,
-		VkMemoryPropertyFlags Properties,
-		VkImage & Image,
-		VkDeviceMemory & ImageMemory
-	);
-
-	/** Helper */VkCommandBuffer BeginSingleTimeCommands(
-		VkDevice Device,
-		VkCommandPool CommandPool
-	);
-
-	/** Helper */void EndSingleTimeCommands(
-		VkDevice Device,
-		VkQueue Queue,
-		VkCommandPool CommandPool,
-		VkCommandBuffer CommandBuffer
-	);
-
-	/** Helper */void TransitionImageLayout(
-		VkDevice Device,
-		VkQueue Queue,
-		VkCommandPool CommandPool,
-		VkImage Image,
-		VkFormat Format,
-		uint32_t MipLevels,
-		VkImageLayout OldLayout,
-		VkImageLayout NewLayout
-	);
-
-	/** Helper */void CopyBufferToImage(
-		VkDevice Device,
-		VkQueue Queue,
-		VkCommandPool CommandPool,
-		VkBuffer SrcBuffer,
-		VkImage DstImage,
-		uint32_t Width,
-		uint32_t Height
-	);
-
-	/** Helper */void GenerateMipmaps(
-		VkPhysicalDevice PhysicalDevice,
-		VkDevice Device,
-		VkCommandPool CommandPool,
-		VkQueue Queue,
-		VkImage Image,
-		VkFormat Format,
-		uint32_t Width,
-		uint32_t Height,
-		uint32_t MipLevels
-	);
-
-	/** Helper */VkSampleCountFlagBits GetMaxUsableSampleCount(
-		VkPhysicalDevice Device
-	);
-
-protected:
 	/** Callback */static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT MessageType,
@@ -325,19 +160,6 @@ protected:
 		int ScanCode,
 		int Action,
 		int Mods
-	);
-
-	/** Loader */static VkResult vkCreateDebugUtilsMessengerEXT(
-		VkInstance Instance,
-		const VkDebugUtilsMessengerCreateInfoEXT * pCreateInfo,
-		const VkAllocationCallbacks * pAllocator,
-		VkDebugUtilsMessengerEXT * pDebugMessenger
-	);
-
-	/** Loader */static void vkDestroyDebugUtilsMessengerEXT(
-		VkInstance Instance,
-		VkDebugUtilsMessengerEXT DebugMessenger,
-		const VkAllocationCallbacks * pAllocator
 	);
 
 	/** Helper */static std::vector<char> ReadFile(
@@ -519,4 +341,4 @@ protected: /** Camera */
 	int m_MouseAction = -1;
 };
 
-} // End namespace
+NAMESPACE_END

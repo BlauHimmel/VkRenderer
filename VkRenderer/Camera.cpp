@@ -3,8 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace VkRenderer
-{
+NAMESPACE_BEGIN(GLOBAL_NAMESPACE)
 
 void Camera::Reset()
 {
@@ -105,4 +104,4 @@ void Camera::ClampRadius(float & Radius) const
 	Radius = std::clamp(Radius, 1e-4f, 50.0f);
 }
 
-} // End namespace
+NAMESPACE_END

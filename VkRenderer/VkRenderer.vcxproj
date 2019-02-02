@@ -162,10 +162,13 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="VulkanHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.hpp" />
     <ClInclude Include="Camera.hpp" />
+    <ClInclude Include="Namespace.hpp" />
+    <ClInclude Include="VulkanHelper.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
