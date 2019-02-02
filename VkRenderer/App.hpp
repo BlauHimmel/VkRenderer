@@ -36,6 +36,7 @@
 //    5. PBR material.
 //    6. Use environment map.
 //    7. Implement IBR.
+//    8. Pipeline cached.
 
 namespace VkRenderer
 {
