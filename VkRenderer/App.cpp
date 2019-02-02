@@ -480,7 +480,7 @@ void App::Run()
 	std::unique_ptr<VkPhysicalDevice[]> PhysicalDevices(new VkPhysicalDevice[DeviceCount]);
 	vkEnumeratePhysicalDevices(m_Instance, &DeviceCount, PhysicalDevices.get());
 
-	uint32_t MaxMemoryAllocationCount = 0;
+	VkDeviceSize MaxMemory = 0;
 	for (uint32_t i = 0; i < DeviceCount; i++)
 	{
 		if (IsPhysicalDeviceSuitable(PhysicalDevices[i], m_Surface))
@@ -488,12 +488,27 @@ void App::Run()
 			VkPhysicalDeviceProperties PhysicalDeviceProperties;
 			vkGetPhysicalDeviceProperties(PhysicalDevices[i], &PhysicalDeviceProperties);
 
-			if (PhysicalDeviceProperties.limits.maxMemoryAllocationCount > MaxMemoryAllocationCount)
+			VkPhysicalDeviceMemoryProperties PhysicalDeviceMemoryProperties;
+			vkGetPhysicalDeviceMemoryProperties(PhysicalDevices[i], &PhysicalDeviceMemoryProperties);
+
+			VkDeviceSize Memory = 0;
+			for (uint32_t i = 0; i < PhysicalDeviceMemoryProperties.memoryHeapCount; i++)
+			{
+				Memory += PhysicalDeviceMemoryProperties.memoryHeaps[i].size / 1024 / 1024;
+			}
+
+			/** We trend to choose discrete GPU */
+			if (PhysicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+			{
+				Memory *= 50;
+			}
+
+			if (Memory > MaxMemory)
 			{
 				m_PhysicalDevice = PhysicalDevices[i];
 				m_MsaaSamples = GetMaxUsableSampleCount(PhysicalDevices[i]);
 				m_GpuName = PhysicalDeviceProperties.deviceName;
-				MaxMemoryAllocationCount = PhysicalDeviceProperties.limits.maxMemoryAllocationCount;
+				MaxMemory = Memory;
 			}
 		}
 	}
