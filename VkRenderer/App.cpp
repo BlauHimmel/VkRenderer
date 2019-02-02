@@ -23,6 +23,9 @@
 #include <stdexcept>
 #include <unordered_map>
 
+namespace VkRenderer
+{
+
 void App::Run()
 {
 	InitWindow();
@@ -42,6 +45,9 @@ void App::Run()
 	glfwSetWindowUserPointer(m_pWindow, this);
 	glfwSetFramebufferSizeCallback(m_pWindow, FramebufferResizeCallback);
 	glfwSetMouseButtonCallback(m_pWindow, MouseButtonCallback);
+	glfwSetCursorPosCallback(m_pWindow, MousePositionCallback);
+	glfwSetScrollCallback(m_pWindow, MouseScrollCallback);
+	glfwSetKeyCallback(m_pWindow, KeyboardCallback);
 }
 
 /** App */void App::InitVulkan()
@@ -287,18 +293,20 @@ void App::Run()
 	auto CurrentTime = std::chrono::high_resolution_clock::now();
 	float DeltaTime = std::chrono::duration<float, std::chrono::seconds::period>(CurrentTime - StartTime).count();
 
+	static glm::vec3 Eye, Target, Up;
+	static float NearZ, FarZ;
+	static glm::vec2 Fov;
+
+	m_Camera.RetriveData(Target, Eye, Up, Fov, NearZ, FarZ);
+
 	MvpUniformBufferObject Transformation = {};
-	Transformation.Model = glm::rotate(
-		glm::mat4(1.0f), 
-		DeltaTime * glm::radians(90.0f), 
-		glm::vec3(0.0f, 0.0f, 1.0f)
-	);
-	Transformation.View = glm::lookAt(m_Eye, m_Target, m_Up);
+	Transformation.Model = glm::mat4(1.0f);
+	Transformation.View = glm::lookAt(Eye, Target, Up);
 	Transformation.Projection = glm::perspective(
-		m_Fov,
+		Fov.y,
 		static_cast<float>(m_SwapChainExtent.width) / static_cast<float>(m_SwapChainExtent.height), 
-		m_NearZ, 
-		m_FarZ
+		NearZ, 
+		FarZ
 	);
 	/** GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted */
 	Transformation.Projection[1][1] *= -1.0f;
@@ -2378,17 +2386,63 @@ void App::LoadObjModel()
 	int Mods
 )
 {
-	if (Action == GLFW_PRESS)
+	App * pApp = reinterpret_cast<App*>(glfwGetWindowUserPointer(pWindow));
+	pApp->m_MouseButton = Button;
+	pApp->m_MouseAction = Action;
+}
+
+/** Callback */void App::MousePositionCallback(
+	GLFWwindow * pWindow, 
+	double X, 
+	double Y
+)
+{
+	static double PreviousX = X, PreviousY = Y;
+	double DeltaX = X - PreviousX;
+	double DeltaY = Y - PreviousY;
+	PreviousX = X;
+	PreviousY = Y;
+
+	App * pApp = reinterpret_cast<App*>(glfwGetWindowUserPointer(pWindow));
+
+	if (pApp->m_MouseButton == GLFW_MOUSE_BUTTON_LEFT && pApp->m_MouseAction != GLFW_RELEASE)
 	{
-		switch (Button)
-		{
-		case GLFW_MOUSE_BUTTON_LEFT:
-			break;
-		case GLFW_MOUSE_BUTTON_MIDDLE:
-			break;
-		case GLFW_MOUSE_BUTTON_RIGHT:
-			break;
-		}
+		pApp->m_Camera.UpdateYaw(static_cast<float>(-DeltaX));
+		pApp->m_Camera.UpdatePitch(static_cast<float>(DeltaY));
+	}
+
+	if (pApp->m_MouseButton == GLFW_MOUSE_BUTTON_RIGHT && pApp->m_MouseAction != GLFW_RELEASE)
+	{
+		pApp->m_Camera.UpdateTarget(
+			static_cast<float>(-DeltaX), 
+			static_cast<float>(DeltaY)
+		);
+	}
+}
+
+/** Callback */void App::MouseScrollCallback(
+	GLFWwindow * pWindow,
+	double OffsetX,
+	double OffsetY
+)
+{
+	App * pApp = reinterpret_cast<App*>(glfwGetWindowUserPointer(pWindow));
+	pApp->m_Camera.UpdateRadius(static_cast<float>(OffsetY * 0.2));
+}
+
+/** Callback */void App::KeyboardCallback(
+	GLFWwindow * pWindow,
+	int Key,
+	int ScanCode,
+	int Action,
+	int Mods
+)
+{
+	App * pApp = reinterpret_cast<App*>(glfwGetWindowUserPointer(pWindow));
+	
+	if (Key == GLFW_KEY_H && Action == GLFW_RELEASE)
+	{
+		pApp->m_Camera.Reset();
 	}
 }
 
@@ -2489,3 +2543,5 @@ std::array<VkVertexInputAttributeDescription, 4> App::Vertex::GetAttributeDescri
 
 	return AttributeDescriptions;
 }
+
+} // End namespace

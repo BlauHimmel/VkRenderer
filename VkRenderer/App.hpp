@@ -1,6 +1,8 @@
 #pragma once
 
+#ifndef GLFW_INCLUDE_VULKAN
 #define GLFW_INCLUDE_VULKAN
+#endif
 #include <GLFW/glfw3.h>
 
 /**
@@ -9,8 +11,12 @@
 * the Vulkan range of 0.0 to 1.0 using the GLM_FORCE_DEPTH_ZERO_TO_ONE
 * definition.
 */
+#ifndef GLM_FORCE_RADIANS
 #define GLM_FORCE_RADIANS
+#endif
+#ifndef GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#endif
 #include <glm/glm.hpp>
 
 #include <cstdint>
@@ -18,6 +24,8 @@
 #include <vector>
 #include <array>
 #include <optional>
+
+#include "Camera.hpp"
 
 //TODO :
 //    1. Update the vertex/index buffer while the app is running.
@@ -27,6 +35,9 @@
 //    5. PBR material.
 //    6. Use environment map.
 //    7. Implement IBR.
+
+namespace VkRenderer
+{
 
 /** An very simple vulkan application. */
 class App
@@ -54,7 +65,7 @@ protected:
 
 protected:
 	/** Vulkan Init */void CreateInstance();
-	
+
 	/** Vulkan Init */void SetupDebugMessenger();
 
 	/** Vulkan Init */void CreateSurface();
@@ -64,15 +75,15 @@ protected:
 	/** Vulkan Init */void CreateLogicalDevice();
 
 	/** Vulkan Init */void CreateSwapChain();
-	
+
 	/** Vulkan Init */void CreateSwapChainImageViews();
-	
+
 	/** Vulkan Init */void CreateRenderPass();
 
 	/** Vulkan Init */void CreateDescriptorSetLayout();
 
 	/** Vulkan Init */void CreateGraphicsPipeline();
-	
+
 	/** Vulkan Init */void CreateCommandPool();
 
 	/** Vulkan Init */void CreateColorResource();
@@ -82,13 +93,13 @@ protected:
 	/** Vulkan Init */void CreateFramebuffers();
 
 	/** Vulkan Init */void CreateTextureImage();
-	
+
 	/** Vulkan Init */void CreateTextureImageView();
 
 	/** Vulkan Init */void CreateTextureSampler();
 
 	/** Vulkan Init */void LoadObjModel();
-	 
+
 	/** Vulkan Init */void CreateVertexBuffer();
 
 	/** Vulkan Init */void CreateIndexBuffer();
@@ -151,7 +162,7 @@ protected:
 	/** Helper */VkPresentModeKHR ChooseSwapPresentMode(
 		const std::vector<VkPresentModeKHR> & AvailablePresentModes
 	) const;
-	
+
 	/** Helper */VkExtent2D ChooseSwapExtent(
 		GLFWwindow * pWindow,
 		const VkSurfaceCapabilitiesKHR & Capabilities
@@ -279,14 +290,34 @@ protected:
 	);
 
 	/** Callback */static void FramebufferResizeCallback(
-		GLFWwindow * pWindow, 
-		int Width, 
+		GLFWwindow * pWindow,
+		int Width,
 		int Height
 	);
 
 	/** Callback */static void MouseButtonCallback(
 		GLFWwindow* pWindow,
 		int Button,
+		int Action,
+		int Mods
+	);
+
+	/** Callback */static void MousePositionCallback(
+		GLFWwindow* pWindow,
+		double X,
+		double Y
+	);
+
+	/** Callback */static void MouseScrollCallback(
+		GLFWwindow* pWindow,
+		double OffsetX,
+		double OffsetY
+	);
+
+	/** Callback */static void KeyboardCallback(
+		GLFWwindow * pWindow, 
+		int Key,
+		int ScanCode,
 		int Action,
 		int Mods
 	);
@@ -321,9 +352,9 @@ protected: /** App */
 
 protected: /** Vulkan pipeline */
 #ifdef NDEBUG
-	const bool m_bEnableValidationLayers = false;
+		const bool m_bEnableValidationLayers = false;
 #else
-	const bool m_bEnableValidationLayers = true;
+		const bool m_bEnableValidationLayers = true;
 #endif
 	const std::vector<const char *> m_ValidationLayers =
 	{
@@ -340,7 +371,7 @@ protected: /** Vulkan pipeline */
 
 	VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;
 	VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
-	
+
 	VkInstance m_Instance = VK_NULL_HANDLE;
 	/** This object will be implicitly destroyed when the VkInstance is destroyed */
 	VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
@@ -356,7 +387,7 @@ protected: /** Vulkan pipeline */
 	VkImageView m_ColorImageView = VK_NULL_HANDLE;
 
 	VkSwapchainKHR m_SwapChain = VK_NULL_HANDLE;
-	/** The images were created by the implementation for the swap chain and 
+	/** The images were created by the implementation for the swap chain and
 	* they will be automatically cleaned up once the swap chain has been destroyed.
 	*/
 	std::vector<VkImage> m_SwapChainImages;
@@ -426,7 +457,7 @@ protected: /** UBO */
 		alignas(16) glm::mat4 Projection;
 	};
 
-	struct LightUniformBufferObject 
+	struct LightUniformBufferObject
 	{
 		alignas(16) glm::vec3 LightPosition;
 		alignas(16) glm::vec3 LightColor;
@@ -450,11 +481,9 @@ protected: /** Texture */
 	VkSampler m_TextureSamler = VK_NULL_HANDLE;
 
 protected: /** Camera */
-	float m_Fov = glm::radians(45.0f);
-	float m_NearZ = 0.1f;
-	float m_FarZ = 10.0f;
-	
-	glm::vec3 m_Target = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3 m_Eye = glm::vec3(2.0f, 0.0f, 2.0f);
-	glm::vec3 m_Up = glm::vec3(0.0f, 0.0f, 1.0f);
+	Camera m_Camera;
+	int m_MouseButton = -1;
+	int m_MouseAction = -1;
 };
+
+} // End namespace
