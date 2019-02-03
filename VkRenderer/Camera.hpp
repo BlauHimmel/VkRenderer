@@ -7,6 +7,9 @@
 
 #include "Namespace.hpp"
 
+#define WINDOW_INIT_WIDTH 1440
+#define WINDOW_INIT_HEIGH 900
+
 NAMESPACE_BEGIN(GLOBAL_NAMESPACE)
 
 class Camera
@@ -41,7 +44,7 @@ protected:
 	float m_NearZ = 0.1f;
 	float m_FarZ = 100.0f;
 
-	glm::vec2 m_Resolution = glm::vec2(800.0f, 600.0f);;
+	glm::vec2 m_Resolution = glm::vec2(WINDOW_INIT_WIDTH, WINDOW_INIT_HEIGH);;
 	glm::vec2 m_Fov = glm::vec2(glm::radians(45.0f), glm::radians(45.0f));
 
 	const float m_YawSpeed = 0.005f;

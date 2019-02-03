@@ -130,13 +130,16 @@ void App::Run()
 			PrevTime = CurrTime;
 			Frame = 0;
 
+			glm::vec3 Eye = m_Camera.GetCachedEye();
+
 			char Buffer[256];
 			sprintf_s(
-				Buffer, "%s [%s] [Vertex : %d Facet : %d] [%s] Fps: %d", 
+				Buffer, "%s [%s] [Vertex : %d Facet : %d] [Eye : (%.2f, %.2f, %.2f)] [%s] Fps: %d", 
 				m_Title.c_str(), 
 				m_GpuName.c_str(),
 				static_cast<int32_t>(m_VertexNum), 
 				static_cast<int32_t>(m_FacetNum),
+				Eye.x, Eye.y, Eye.z,
 				m_GraphicsPipelinesDescription[m_GraphicsPipelineDisplayMode | m_GraphicsPipelineCullMode],
 				static_cast<int32_t>(m_FPS)
 			);
@@ -266,12 +269,10 @@ void App::Run()
 	vkDestroyBuffer(m_Device, m_VertexBuffer, nullptr);
 	vkFreeMemory(m_Device, m_VertexBufferMemory, nullptr);
 
-	vkDestroySampler(m_Device, m_TextureSamler, nullptr);
-
-	vkDestroyImageView(m_Device, m_TextureImageView, nullptr);
-
-	vkDestroyImage(m_Device, m_TextureImage, nullptr);
-	vkFreeMemory(m_Device, m_TextureImageMemory, nullptr);
+	vkDestroySampler(m_Device, m_AlbedoTextureSamler, nullptr);
+	vkDestroyImageView(m_Device, m_AlbedoTextureImageView, nullptr);
+	vkDestroyImage(m_Device, m_AlbedoTextureImage, nullptr);
+	vkFreeMemory(m_Device, m_AlbedoTextureImageMemory, nullptr);
 
 	vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
 	
@@ -1279,14 +1280,14 @@ void App::RecreateDrawingCommandBuffer()
 {
 	int TexWidth = -1, TexHeight = -1, TexChannels = -1;
 	stbi_uc * pPixels = stbi_load(
-		m_TexturePath.c_str(),
+		m_AlbedoTexturePath.c_str(),
 		&TexWidth, 
 		&TexHeight, 
 		&TexChannels,
 		STBI_rgb_alpha
 	);
 	VkDeviceSize ImageSize = TexWidth * TexHeight * 4;
-	m_MipLevels = static_cast<uint32_t>(
+	m_AlbedoMipLevels = static_cast<uint32_t>(
 		std::floor(std::log2(std::max(TexWidth, TexHeight)))
 	) + 1;
 
@@ -1320,7 +1321,7 @@ void App::RecreateDrawingCommandBuffer()
 		m_Device,
 		static_cast<uint32_t>(TexWidth),
 		static_cast<uint32_t>(TexHeight),
-		m_MipLevels,
+		m_AlbedoMipLevels,
 		VK_SAMPLE_COUNT_1_BIT,
 		VK_FORMAT_R8G8B8A8_UNORM,
 		VK_IMAGE_TILING_OPTIMAL,
@@ -1328,17 +1329,17 @@ void App::RecreateDrawingCommandBuffer()
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
 		VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_TextureImage,
-		m_TextureImageMemory
+		m_AlbedoTextureImage,
+		m_AlbedoTextureImageMemory
 	);
 
 	TransitionImageLayout(
 		m_Device,
 		m_GraphicsQueue,
 		m_CommandPool,
-		m_TextureImage,
+		m_AlbedoTextureImage,
 		VK_FORMAT_R8G8B8A8_UNORM,
-		m_MipLevels,
+		m_AlbedoMipLevels,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
 	);
@@ -1348,7 +1349,7 @@ void App::RecreateDrawingCommandBuffer()
 		m_GraphicsQueue,
 		m_CommandPool,
 		StagingBuffer,
-		m_TextureImage,
+		m_AlbedoTextureImage,
 		static_cast<uint32_t>(TexWidth),
 		static_cast<uint32_t>(TexHeight)
 	);
@@ -1358,11 +1359,11 @@ void App::RecreateDrawingCommandBuffer()
 		m_Device,
 		m_CommandPool,
 		m_GraphicsQueue,
-		m_TextureImage,
+		m_AlbedoTextureImage,
 		VK_FORMAT_R8G8B8A8_UNORM,
 		TexWidth,
 		TexHeight,
-		m_MipLevels
+		m_AlbedoMipLevels
 	);
 
 	vkDestroyBuffer(m_Device, StagingBuffer, nullptr);
@@ -1373,11 +1374,11 @@ void App::RecreateDrawingCommandBuffer()
 {
 	CreateImageView(
 		m_Device, 
-		m_TextureImage, 
+		m_AlbedoTextureImage, 
 		VK_FORMAT_R8G8B8A8_UNORM,
-		m_MipLevels,
+		m_AlbedoMipLevels,
 		VK_IMAGE_ASPECT_COLOR_BIT,
-		m_TextureImageView
+		m_AlbedoTextureImageView
 	);
 }
 
@@ -1399,9 +1400,9 @@ void App::RecreateDrawingCommandBuffer()
 	CreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	CreateInfo.mipLodBias = 0.0f;
 	CreateInfo.minLod = 0.0f;
-	CreateInfo.maxLod = static_cast<float>(m_MipLevels);
+	CreateInfo.maxLod = static_cast<float>(m_AlbedoMipLevels);
 
-	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_TextureSamler) != VK_SUCCESS)
+	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_AlbedoTextureSamler) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create texture sampler!");
 	}
@@ -1689,8 +1690,8 @@ void App::CreateMaterialUniformBuffer()
 
 		VkDescriptorImageInfo ImageInfo = {};
 		ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		ImageInfo.imageView = m_TextureImageView;
-		ImageInfo.sampler = m_TextureSamler;
+		ImageInfo.imageView = m_AlbedoTextureImageView;
+		ImageInfo.sampler = m_AlbedoTextureSamler;
 
 		std::array<VkWriteDescriptorSet, 4> DescriptorWrites = {};
 		

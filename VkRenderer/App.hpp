@@ -171,8 +171,8 @@ protected:
 
 protected: /** App */
 	GLFWwindow * m_pWindow = nullptr;
-	uint32_t m_InitWidth = 800;
-	uint32_t m_InitHeight = 600;
+	uint32_t m_InitWidth = WINDOW_INIT_WIDTH;
+	uint32_t m_InitHeight = WINDOW_INIT_HEIGH;
 	std::string m_Title = "Vulkan";
 	std::string m_AppName = "VulkanApp";
 	std::string m_EngineName = "VulkanEngine";
@@ -295,7 +295,7 @@ protected: /** Mesh */
 		bool operator()(const Vertex & Lhs, const Vertex & Rhs) const;
 	};
 
-	const std::string m_ModelPath = "Models/Chalet.obj";
+	const std::string m_ModelPath = "Models/Cerberus.obj";
 	std::vector<Vertex> m_Vertices;
 	std::vector<uint32_t> m_Indices;
 
@@ -343,12 +343,12 @@ protected: /** UBO */
 	std::vector<VkDescriptorSet> m_DescriptorSets;
 
 protected: /** Texture */
-	const std::string m_TexturePath = "Textures/Chalet/Chalet_A.png";
-	uint32_t m_MipLevels = 0;
-	VkImage m_TextureImage = VK_NULL_HANDLE;
-	VkDeviceMemory m_TextureImageMemory = VK_NULL_HANDLE;
-	VkImageView m_TextureImageView = VK_NULL_HANDLE;
-	VkSampler m_TextureSamler = VK_NULL_HANDLE;
+	const std::string m_AlbedoTexturePath = "Textures/Cerberus/Cerberus_A.png";
+	uint32_t m_AlbedoMipLevels = 0;
+	VkImage m_AlbedoTextureImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_AlbedoTextureImageMemory = VK_NULL_HANDLE;
+	VkImageView m_AlbedoTextureImageView = VK_NULL_HANDLE;
+	VkSampler m_AlbedoTextureSamler = VK_NULL_HANDLE;
 
 protected: /** Camera */
 	Camera m_Camera;
