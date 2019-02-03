@@ -11,12 +11,13 @@
 * the Vulkan range of 0.0 to 1.0 using the GLM_FORCE_DEPTH_ZERO_TO_ONE
 * definition.
 */
-#ifndef GLM_FORCE_RADIANS
-#define GLM_FORCE_RADIANS
-#endif
 #ifndef GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #endif
+#ifndef GLM_FORCE_RADIANS
+#define GLM_FORCE_RADIANS
+#endif
+
 #include <glm/glm.hpp>
 
 #include <cstdint>
@@ -97,7 +98,7 @@ protected:
 
 	/** Vulkan Init */void CreateFramebuffers();
 
-	/** Vulkan Init */void CreateTextureImage();
+	/** Vulkan Init */void LoadAndCreateTextureImage();
 
 	/** Vulkan Init */void CreateTextureImageView();
 
@@ -112,6 +113,8 @@ protected:
 	/** Vulkan Init */void CreateMvpUniformBuffer();
 
 	/** Vulkan Init */void CreateLightUniformBuffer();
+
+	/** Vulkan Init */void CreateMaterialUniformBuffer();
 
 	/** Vulkan Init */void CreateDescriptorPool();
 
@@ -292,7 +295,7 @@ protected: /** Mesh */
 		bool operator()(const Vertex & Lhs, const Vertex & Rhs) const;
 	};
 
-	const std::string m_ModelPath = "Models/chalet.obj";
+	const std::string m_ModelPath = "Models/Chalet.obj";
 	std::vector<Vertex> m_Vertices;
 	std::vector<uint32_t> m_Indices;
 
@@ -312,10 +315,20 @@ protected: /** UBO */
 		alignas(16) glm::mat4 Projection;
 	};
 
+	static const uint32_t m_LightNum = 8;
 	struct LightUniformBufferObject
 	{
-		alignas(16) glm::vec3 LightPosition;
-		alignas(16) glm::vec3 LightColor;
+		alignas(16) glm::vec4 LightPosition[m_LightNum];
+		alignas(16) glm::vec4 LightColor[m_LightNum];
+		alignas(16) glm::vec3 ViewPosition;
+	};
+
+	struct MaterialUniformBufferObject
+	{
+		alignas(16) glm::vec4 Albedo;
+		alignas(4) float Metallic;
+		alignas(4) float Roughness;
+		alignas(4) float Ao;
 	};
 
 	VkDescriptorSetLayout m_DescriptorSetLayout = VK_NULL_HANDLE;
@@ -323,12 +336,14 @@ protected: /** UBO */
 	std::vector<VkDeviceMemory> m_MvpUniformBufferMemories;
 	std::vector<VkBuffer> m_LightUniformBuffers;
 	std::vector<VkDeviceMemory> m_LightUniformBufferMemories;
+	std::vector<VkBuffer> m_MaterialUniformBuffers;
+	std::vector<VkDeviceMemory> m_MaterialUniformBufferMemories;
 	VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
 	/** Descriptor sets will be automatically freed when the descriptor pool is destroyed. */
 	std::vector<VkDescriptorSet> m_DescriptorSets;
 
 protected: /** Texture */
-	const std::string m_TexturePath = "Textures/chalet.jpg";
+	const std::string m_TexturePath = "Textures/Chalet/Chalet_A.png";
 	uint32_t m_MipLevels = 0;
 	VkImage m_TextureImage = VK_NULL_HANDLE;
 	VkDeviceMemory m_TextureImageMemory = VK_NULL_HANDLE;

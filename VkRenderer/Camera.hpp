@@ -22,6 +22,10 @@ public:
 	void SetResolution(float Width, float Height);
 	void RetriveData(glm::vec3 & Target, glm::vec3 & Eye, glm::vec3 & Up, glm::vec2 & Fov,float & NearZ, float & FarZ);
 
+	glm::vec3 GetCachedTarget() const;
+	glm::vec3 GetCachedUp() const;
+	glm::vec3 GetCachedEye() const;
+
 protected:
 	void ClampYaw(float & Yaw) const;
 	void ClampPitch(float & Pitch) const;
@@ -44,6 +48,10 @@ protected:
 	const float m_PitchSpeed = 0.005f;
 	const float m_RadiusSpeed = 0.2f;
 	const float m_TargetSpeed = 0.005f;
+
+	/** Cached data */
+	glm::vec3 m_Eye = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 m_Up = glm::vec3(0.0f, 0.0f, 0.0f);
 };
 
 NAMESPACE_END

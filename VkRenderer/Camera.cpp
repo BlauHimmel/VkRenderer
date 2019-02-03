@@ -87,6 +87,25 @@ void Camera::RetriveData(glm::vec3 & Target, glm::vec3 & Eye, glm::vec3 & Up, gl
 
 	NearZ = m_NearZ;
 	FarZ = m_FarZ;
+
+	/** Cache data */
+	m_Up = Up;
+	m_Eye = Eye;
+}
+
+glm::vec3 Camera::GetCachedTarget() const
+{
+	return m_Target;
+}
+
+glm::vec3 Camera::GetCachedUp() const
+{
+	return m_Up;
+}
+
+glm::vec3 Camera::GetCachedEye() const
+{
+	return m_Eye;
 }
 
 void Camera::ClampYaw(float & Yaw) const

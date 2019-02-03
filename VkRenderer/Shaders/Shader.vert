@@ -23,7 +23,7 @@ void main()
 {
     FragPosition = Transformation.Projection * Transformation.View * Transformation.Model * vec4(Position, 1.0);
     FragColor = Color;
-    FragNormal = Normal;
+    FragNormal = mat3(Transformation.Model) * Normal;
     FragTexCoord = TexCoord;
     FragPositionW = (Transformation.Model * vec4(Position, 1.0)).xyz;
 

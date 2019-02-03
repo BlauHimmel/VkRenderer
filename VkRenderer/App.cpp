@@ -78,7 +78,7 @@ void App::Run()
 
 	CreateFramebuffers();
 
-	CreateTextureImage();
+	LoadAndCreateTextureImage();
 
 	CreateTextureImageView();
 
@@ -93,6 +93,8 @@ void App::Run()
 	CreateMvpUniformBuffer();
 
 	CreateLightUniformBuffer();
+
+	CreateMaterialUniformBuffer();
 
 	CreateDescriptorPool();
 
@@ -242,6 +244,12 @@ void App::Run()
 
 	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 	{
+		vkDestroyBuffer(m_Device, m_MaterialUniformBuffers[i], nullptr);
+		vkFreeMemory(m_Device, m_MaterialUniformBufferMemories[i], nullptr);
+	}
+
+	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	{
 		vkDestroyBuffer(m_Device, m_LightUniformBuffers[i], nullptr);
 		vkFreeMemory(m_Device, m_LightUniformBufferMemories[i], nullptr);
 	}
@@ -291,6 +299,7 @@ void App::Run()
 	static auto StartTime = std::chrono::high_resolution_clock::now();
 	auto CurrentTime = std::chrono::high_resolution_clock::now();
 	float DeltaTime = std::chrono::duration<float, std::chrono::seconds::period>(CurrentTime - StartTime).count();
+	DeltaTime *= 10.0f;
 
 	static glm::vec3 Eye, Target, Up;
 	static float NearZ, FarZ;
@@ -317,13 +326,40 @@ void App::Run()
 
 	/** Update light information */
 	LightUniformBufferObject Lighting = {};
-	Lighting.LightPosition = glm::vec3(1.5f, 0.0f, 1.5f);
-	Lighting.LightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+	Lighting.LightPosition[0] = glm::vec4(-2.0, -2.0, 2.0f, 1.0f);
+	Lighting.LightPosition[1] = glm::vec4(2.0, -2.0, 2.0f, 1.0f);
+	Lighting.LightPosition[2] = glm::vec4(-2.0, 2.0, 2.0f, 1.0f);
+	Lighting.LightPosition[3] = glm::vec4(2.0, 2.0, 2.0f, 1.0f);
+	Lighting.LightPosition[4] = glm::vec4(-2.0, -2.0, -2.0f, 1.0f);
+	Lighting.LightPosition[5] = glm::vec4(2.0, -2.0, -2.0f, 1.0f);
+	Lighting.LightPosition[6] = glm::vec4(-2.0, 2.0, -2.0f, 1.0f);
+	Lighting.LightPosition[7] = glm::vec4(2.0, 2.0, -2.0f, 1.0f);
+	Lighting.LightColor[0] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.LightColor[1] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.LightColor[2] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.LightColor[3] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.LightColor[4] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.LightColor[5] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.LightColor[6] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.LightColor[7] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.ViewPosition = m_Camera.GetCachedEye();
 
 	pData = nullptr;
 	vkMapMemory(m_Device, m_LightUniformBufferMemories[CurrentImage], 0, sizeof(Lighting), 0, &pData);
 	memcpy(pData, &Lighting, sizeof(Lighting));
 	vkUnmapMemory(m_Device, m_LightUniformBufferMemories[CurrentImage]);
+
+	/** Update material information */
+	MaterialUniformBufferObject Material = {};
+	Material.Albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0);
+	Material.Ao = 1.0f;
+	Material.Metallic = 0.15f;
+	Material.Roughness = 0.35f;
+
+	pData = nullptr;
+	vkMapMemory(m_Device, m_MaterialUniformBufferMemories[CurrentImage], 0, sizeof(Material), 0, &pData);
+	memcpy(pData, &Material, sizeof(Material));
+	vkUnmapMemory(m_Device, m_MaterialUniformBufferMemories[CurrentImage]);
 }
 
 /** App Helper */void App::RecreateSwapChainAndRelevantObject()
@@ -768,17 +804,25 @@ void App::RecreateDrawingCommandBuffer()
 	LightUboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	LightUboLayoutBinding.pImmutableSamplers = nullptr;
 
+	VkDescriptorSetLayoutBinding MaterialUboLayoutBinding = {};
+	MaterialUboLayoutBinding.binding = 2;
+	MaterialUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	MaterialUboLayoutBinding.descriptorCount = 1;
+	MaterialUboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	MaterialUboLayoutBinding.pImmutableSamplers = nullptr;
+
 	VkDescriptorSetLayoutBinding SamplerLayoutBinding = {};
-	SamplerLayoutBinding.binding = 2;
+	SamplerLayoutBinding.binding = 3;
 	SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	SamplerLayoutBinding.descriptorCount = 1;
 	SamplerLayoutBinding.pImmutableSamplers = nullptr;
 	SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	std::array<VkDescriptorSetLayoutBinding, 3> Bindings =
+	std::array<VkDescriptorSetLayoutBinding, 4> Bindings =
 	{
 		MvpUboLayoutBinding,
 		LightUboLayoutBinding,
+		MaterialUboLayoutBinding,
 		SamplerLayoutBinding
 	};
 
@@ -1231,7 +1275,7 @@ void App::RecreateDrawingCommandBuffer()
 	}
 }
 
-/** Vulkan Init */void App::CreateTextureImage()
+/** Vulkan Init */void App::LoadAndCreateTextureImage()
 {
 	int TexWidth = -1, TexHeight = -1, TexChannels = -1;
 	stbi_uc * pPixels = stbi_load(
@@ -1562,9 +1606,30 @@ void App::LoadObjModel()
 	}
 }
 
+void App::CreateMaterialUniformBuffer()
+{
+	VkDeviceSize BufferSize = sizeof(MaterialUniformBufferObject);
+
+	m_MaterialUniformBuffers.resize(m_SwapChainImages.size());
+	m_MaterialUniformBufferMemories.resize(m_SwapChainImages.size());
+
+	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	{
+		CreateBuffer(
+			m_PhysicalDevice,
+			m_Device,
+			BufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			m_MaterialUniformBuffers[i],
+			m_MaterialUniformBufferMemories[i]
+		);
+	}
+}
+
 /** Vulkan Init */void App::CreateDescriptorPool()
 {
-	std::array<VkDescriptorPoolSize, 3> PoolSizes = {};
+	std::array<VkDescriptorPoolSize, 4> PoolSizes = {};
 	
 	PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	PoolSizes[0].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
@@ -1572,8 +1637,11 @@ void App::LoadObjModel()
 	PoolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	PoolSizes[1].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
 
-	PoolSizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	PoolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	PoolSizes[2].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+
+	PoolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	PoolSizes[3].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
 
 	VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 	PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1614,12 +1682,17 @@ void App::LoadObjModel()
 		LightBufferInfo.offset = 0;
 		LightBufferInfo.range = sizeof(LightUniformBufferObject);
 
+		VkDescriptorBufferInfo MaterialBufferInfo = {};
+		MaterialBufferInfo.buffer = m_MaterialUniformBuffers[i];
+		MaterialBufferInfo.offset = 0;
+		MaterialBufferInfo.range = sizeof(MaterialUniformBufferObject);
+
 		VkDescriptorImageInfo ImageInfo = {};
 		ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		ImageInfo.imageView = m_TextureImageView;
 		ImageInfo.sampler = m_TextureSamler;
 
-		std::array<VkWriteDescriptorSet, 3> DescriptorWrites = {};
+		std::array<VkWriteDescriptorSet, 4> DescriptorWrites = {};
 		
 		DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		DescriptorWrites[0].dstSet = m_DescriptorSets[i];
@@ -1645,11 +1718,21 @@ void App::LoadObjModel()
 		DescriptorWrites[2].dstSet = m_DescriptorSets[i];
 		DescriptorWrites[2].dstBinding = 2;
 		DescriptorWrites[2].dstArrayElement = 0;
-		DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		DescriptorWrites[2].descriptorCount = 1;
-		DescriptorWrites[2].pBufferInfo = nullptr;
-		DescriptorWrites[2].pImageInfo = &ImageInfo;
+		DescriptorWrites[2].pBufferInfo = &MaterialBufferInfo;
+		DescriptorWrites[2].pImageInfo = nullptr;
 		DescriptorWrites[2].pTexelBufferView = nullptr;
+
+		DescriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrites[3].dstSet = m_DescriptorSets[i];
+		DescriptorWrites[3].dstBinding = 3;
+		DescriptorWrites[3].dstArrayElement = 0;
+		DescriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[3].descriptorCount = 1;
+		DescriptorWrites[3].pBufferInfo = nullptr;
+		DescriptorWrites[3].pImageInfo = &ImageInfo;
+		DescriptorWrites[3].pTexelBufferView = nullptr;
 
 		vkUpdateDescriptorSets(
 			m_Device, 
