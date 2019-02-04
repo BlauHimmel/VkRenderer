@@ -936,8 +936,10 @@ void vkDestroyDebugUtilsMessengerEXT(
 	{
 		Func(Instance, DebugMessenger, pAllocator);
 	}
-
-	std::cerr << "Function vkDestroyDebugUtilsMessengerEXT not found!" << std::endl;
+	else
+	{
+		std::cerr << "Function vkDestroyDebugUtilsMessengerEXT not found!" << std::endl;
+	}
 }
 
 NAMESPACE_END
