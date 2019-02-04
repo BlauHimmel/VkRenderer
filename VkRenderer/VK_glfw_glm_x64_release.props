@@ -3,12 +3,12 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <IncludePath>$(VULKAN_SDK)\Include;$(SolutionDir)Extensions\glm\include;$(SolutionDir)Extensions\glfw\include;$(SolutionDir)Extensions\stb_image\include;$(SolutionDir)Extensions\tinyobjloader\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(VULKAN_SDK)\Lib;$(SolutionDir)Extensions\glm\lib\release;$(SolutionDir)Extensions\glfw\lib\release;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VULKAN_SDK)\Include;$(SolutionDir)Extensions\glm\include;$(SolutionDir)Extensions\glfw\include;$(SolutionDir)Extensions\stb_image\include;$(SolutionDir)Extensions\tinyobjloader\include;$(SolutionDir)Extensions\assimp\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VULKAN_SDK)\Lib;$(SolutionDir)Extensions\glm\lib\release;$(SolutionDir)Extensions\glfw\lib\release;$(SolutionDir)Extensions\assimp\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <Link>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;glm_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;glm_static.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ClCompile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>

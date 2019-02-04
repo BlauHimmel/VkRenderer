@@ -20,12 +20,17 @@ layout(binding = 2) uniform MaterialUniformBufferObject
 } Material;
 
 layout(binding = 3) uniform sampler2D AlbedoSampler;
+layout(binding = 4) uniform sampler2D NormalSampler;
+layout(binding = 5) uniform sampler2D MetallicSampler;
+layout(binding = 6) uniform sampler2D RoughnessSampler;
+layout(binding = 7) uniform sampler2D AoSampler;
 
-layout(location = 0) in vec4 FragPosition;
+layout(location = 0) in vec4 FragPositionH;
 layout(location = 1) in vec3 FragColor;
-layout(location = 2) in vec3 FragNormal;
-layout(location = 3) in vec2 FragTexCoord;
-layout(location = 4) in vec3 FragPositionW;
+layout(location = 2) in vec2 FragTexCoord;
+layout(location = 3) in vec3 FragPositionW;
+layout(location = 4) in vec3 FragNormalW;
+layout(location = 5) in vec3 FragTangentW;
 
 layout(location = 0) out vec4 OutColor;
 
@@ -69,15 +74,38 @@ vec3 FresnelSchlick(float NDotV, vec3 F0)
     return F0 + (1.0 - F0) * pow(1.0 - NDotV, 5.0);
 }
 
+vec3 TangentSpaceToWorldSpace(vec3 NormalMapSample, vec3 NormalW, vec3 TangentW)
+{
+    vec3 NormalRemapped = NormalMapSample * 2.0 - 1.0;
+
+    vec3 N = NormalW;
+    vec3 T = normalize(TangentW - dot(TangentW, N) * N);
+    vec3 B = cross(N, T);
+
+    mat3 TBN = mat3(T, B, N);
+
+    return TBN * NormalRemapped;
+}
+
 void main()
 {
-    vec3 Albedo = (Material.Albedo * texture(AlbedoSampler, FragTexCoord)).xyz;
+    // Albedo textures that come from artists are generally authored in sRGB space, thus
+    // we first convert them to linear space before using albedo in lighting calculations
+    vec3 Albedo = (Material.Albedo * pow(texture(AlbedoSampler, FragTexCoord), vec4(2.2))).xyz;
+    vec3 Normal = TangentSpaceToWorldSpace(
+        texture(NormalSampler, FragTexCoord).xyz,
+        FragNormalW,
+        FragTangentW
+    );
+    float Metallic = Material.Metallic * texture(MetallicSampler, FragTexCoord).x;
+    float Roughness = Material.Roughness * texture(RoughnessSampler, FragTexCoord).x;
+    float Ao = Material.Ao * texture(AoSampler, FragTexCoord).x;
 
-    vec3 N = normalize(FragNormal);
+    vec3 N = normalize(Normal);
     vec3 V = normalize(Lighting.ViewPosition.xyz - FragPositionW);
 
     vec3 F0 = vec3(0.04);
-    F0 = mix(F0, Albedo, Material.Metallic);
+    F0 = mix(F0, Albedo, Metallic);
 
     vec3 Lo = vec3(0.0);
 
@@ -90,8 +118,8 @@ void main()
         float Attenuation = 1.0 / (Distance * Distance);
         vec3 Radiance = Lighting.LightColor[i].xyz * Attenuation;
 
-        float NDF = DistributionGGX(N, H, Material.Roughness);
-        float G = GeometrySmith(N, V, L, Material.Roughness);
+        float NDF = DistributionGGX(N, H, Roughness);
+        float G = GeometrySmith(N, V, L, Roughness);
         vec3 F = FresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
 
         vec3 Numerator = NDF * G * F;
@@ -101,13 +129,13 @@ void main()
 
         vec3 Ks = F;
         vec3 Kd = vec3(1.0) - Ks;
-        Kd *= (1.0 - Material.Metallic);
+        Kd *= (1.0 - Metallic);
 
         float NDotL = max(dot(N, L), 0.0);
         Lo += (Kd * Albedo / PI + Specular) * Radiance * NDotL;
     }
 
-    vec3 Ambient = vec3(0.03) * Albedo * Material.Ao;
+    vec3 Ambient = vec3(0.03) * Albedo * Ao;
     vec3 Color = Ambient + Lo;
 
     Color = Color / (Color + vec3(1.0));

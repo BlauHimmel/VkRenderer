@@ -1,8 +1,5 @@
 #include "App.hpp"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
 #include <glm/gtc/matrix_transform.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -10,6 +7,10 @@
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 #include <set>
 #include <chrono>
@@ -269,7 +270,27 @@ void App::Run()
 	vkDestroyBuffer(m_Device, m_VertexBuffer, nullptr);
 	vkFreeMemory(m_Device, m_VertexBufferMemory, nullptr);
 
-	vkDestroySampler(m_Device, m_AlbedoTextureSamler, nullptr);
+	vkDestroySampler(m_Device, m_AoTextureSampler, nullptr);
+	vkDestroyImageView(m_Device, m_AoTextureImageView, nullptr);
+	vkDestroyImage(m_Device, m_AoTextureImage, nullptr);
+	vkFreeMemory(m_Device, m_AoTextureImageMemory, nullptr);
+
+	vkDestroySampler(m_Device, m_RoughnessTextureSampler, nullptr);
+	vkDestroyImageView(m_Device, m_RoughnessTextureImageView, nullptr);
+	vkDestroyImage(m_Device, m_RoughnessTextureImage, nullptr);
+	vkFreeMemory(m_Device, m_RoughnessTextureImageMemory, nullptr);
+
+	vkDestroySampler(m_Device, m_MetallicTextureSampler, nullptr);
+	vkDestroyImageView(m_Device, m_MetallicTextureImageView, nullptr);
+	vkDestroyImage(m_Device, m_MetallicTextureImage, nullptr);
+	vkFreeMemory(m_Device, m_MetallicTextureImageMemory, nullptr);
+
+	vkDestroySampler(m_Device, m_NormalTextureSampler, nullptr);
+	vkDestroyImageView(m_Device, m_NormalTextureImageView, nullptr);
+	vkDestroyImage(m_Device, m_NormalTextureImage, nullptr);
+	vkFreeMemory(m_Device, m_NormalTextureImageMemory, nullptr);
+
+	vkDestroySampler(m_Device, m_AlbedoTextureSampler, nullptr);
 	vkDestroyImageView(m_Device, m_AlbedoTextureImageView, nullptr);
 	vkDestroyImage(m_Device, m_AlbedoTextureImage, nullptr);
 	vkFreeMemory(m_Device, m_AlbedoTextureImageMemory, nullptr);
@@ -310,6 +331,7 @@ void App::Run()
 
 	MvpUniformBufferObject Transformation = {};
 	Transformation.Model = glm::mat4(1.0f);
+	Transformation.ModelInvTranspose = glm::transpose(glm::inverse(Transformation.Model));
 	Transformation.View = glm::lookAt(Eye, Target, Up);
 	Transformation.Projection = glm::perspective(
 		Fov.y,
@@ -335,14 +357,14 @@ void App::Run()
 	Lighting.LightPosition[5] = glm::vec4(2.0, -2.0, -2.0f, 1.0f);
 	Lighting.LightPosition[6] = glm::vec4(-2.0, 2.0, -2.0f, 1.0f);
 	Lighting.LightPosition[7] = glm::vec4(2.0, 2.0, -2.0f, 1.0f);
-	Lighting.LightColor[0] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
-	Lighting.LightColor[1] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
-	Lighting.LightColor[2] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
-	Lighting.LightColor[3] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
-	Lighting.LightColor[4] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
-	Lighting.LightColor[5] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
-	Lighting.LightColor[6] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
-	Lighting.LightColor[7] = glm::vec4(12.0f, 12.0f, 12.0f, 1.0f);
+	Lighting.LightColor[0] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
+	Lighting.LightColor[1] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
+	Lighting.LightColor[2] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
+	Lighting.LightColor[3] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
+	Lighting.LightColor[4] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
+	Lighting.LightColor[5] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
+	Lighting.LightColor[6] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
+	Lighting.LightColor[7] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
 	Lighting.ViewPosition = m_Camera.GetCachedEye();
 
 	pData = nullptr;
@@ -354,8 +376,8 @@ void App::Run()
 	MaterialUniformBufferObject Material = {};
 	Material.Albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0);
 	Material.Ao = 1.0f;
-	Material.Metallic = 0.15f;
-	Material.Roughness = 0.35f;
+	Material.Metallic = 1.0f;
+	Material.Roughness = 1.0f;
 
 	pData = nullptr;
 	vkMapMemory(m_Device, m_MaterialUniformBufferMemories[CurrentImage], 0, sizeof(Material), 0, &pData);
@@ -812,19 +834,51 @@ void App::RecreateDrawingCommandBuffer()
 	MaterialUboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	MaterialUboLayoutBinding.pImmutableSamplers = nullptr;
 
-	VkDescriptorSetLayoutBinding SamplerLayoutBinding = {};
-	SamplerLayoutBinding.binding = 3;
-	SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	SamplerLayoutBinding.descriptorCount = 1;
-	SamplerLayoutBinding.pImmutableSamplers = nullptr;
-	SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	VkDescriptorSetLayoutBinding AlbedoSamplerLayoutBinding = {};
+	AlbedoSamplerLayoutBinding.binding = 3;
+	AlbedoSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	AlbedoSamplerLayoutBinding.descriptorCount = 1;
+	AlbedoSamplerLayoutBinding.pImmutableSamplers = nullptr;
+	AlbedoSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	std::array<VkDescriptorSetLayoutBinding, 4> Bindings =
+	VkDescriptorSetLayoutBinding NormalSamplerLayoutBinding = {};
+	NormalSamplerLayoutBinding.binding = 4;
+	NormalSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	NormalSamplerLayoutBinding.descriptorCount = 1;
+	NormalSamplerLayoutBinding.pImmutableSamplers = nullptr;
+	NormalSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutBinding MetallicSamplerLayoutBinding = {};
+	MetallicSamplerLayoutBinding.binding = 5;
+	MetallicSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	MetallicSamplerLayoutBinding.descriptorCount = 1;
+	MetallicSamplerLayoutBinding.pImmutableSamplers = nullptr;
+	MetallicSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutBinding RoughnessSamplerLayoutBinding = {};
+	RoughnessSamplerLayoutBinding.binding = 6;
+	RoughnessSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	RoughnessSamplerLayoutBinding.descriptorCount = 1;
+	RoughnessSamplerLayoutBinding.pImmutableSamplers = nullptr;
+	RoughnessSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutBinding AoSamplerLayoutBinding = {};
+	AoSamplerLayoutBinding.binding = 7;
+	AoSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	AoSamplerLayoutBinding.descriptorCount = 1;
+	AoSamplerLayoutBinding.pImmutableSamplers = nullptr;
+	AoSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	std::array<VkDescriptorSetLayoutBinding, 8> Bindings =
 	{
 		MvpUboLayoutBinding,
 		LightUboLayoutBinding,
 		MaterialUboLayoutBinding,
-		SamplerLayoutBinding
+		AlbedoSamplerLayoutBinding,
+		NormalSamplerLayoutBinding,
+		MetallicSamplerLayoutBinding,
+		RoughnessSamplerLayoutBinding,
+		AoSamplerLayoutBinding
 	};
 
 	VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = {};
@@ -1278,96 +1332,60 @@ void App::RecreateDrawingCommandBuffer()
 
 /** Vulkan Init */void App::LoadAndCreateTextureImage()
 {
-	int TexWidth = -1, TexHeight = -1, TexChannels = -1;
-	stbi_uc * pPixels = stbi_load(
+	CreateTextureImageFromFile(
+		m_PhysicalDevice,
+		m_Device,
+		m_CommandPool,
+		m_GraphicsQueue,
 		m_AlbedoTexturePath.c_str(),
-		&TexWidth, 
-		&TexHeight, 
-		&TexChannels,
-		STBI_rgb_alpha
-	);
-	VkDeviceSize ImageSize = TexWidth * TexHeight * 4;
-	m_AlbedoMipLevels = static_cast<uint32_t>(
-		std::floor(std::log2(std::max(TexWidth, TexHeight)))
-	) + 1;
-
-	if (pPixels == nullptr)
-	{
-		throw std::runtime_error("Failed to load texture image!");
-	}
-
-	VkBuffer StagingBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory StagingBufferMemory = VK_NULL_HANDLE;
-
-	CreateBuffer(
-		m_PhysicalDevice,
-		m_Device,
-		ImageSize,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		StagingBuffer,
-		StagingBufferMemory
-	);
-
-	void * pData = nullptr;
-	vkMapMemory(m_Device, StagingBufferMemory, 0, ImageSize, 0, &pData);
-	memcpy(pData, pPixels, static_cast<size_t>(ImageSize));
-	vkUnmapMemory(m_Device, StagingBufferMemory);
-
-	stbi_image_free(pPixels);
-
-	CreateImage(
-		m_PhysicalDevice,
-		m_Device,
-		static_cast<uint32_t>(TexWidth),
-		static_cast<uint32_t>(TexHeight),
 		m_AlbedoMipLevels,
-		VK_SAMPLE_COUNT_1_BIT,
-		VK_FORMAT_R8G8B8A8_UNORM,
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_TRANSFER_SRC_BIT | 
-		VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
-		VK_IMAGE_USAGE_SAMPLED_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		m_AlbedoTextureImage,
 		m_AlbedoTextureImageMemory
 	);
 
-	TransitionImageLayout(
-		m_Device,
-		m_GraphicsQueue,
-		m_CommandPool,
-		m_AlbedoTextureImage,
-		VK_FORMAT_R8G8B8A8_UNORM,
-		m_AlbedoMipLevels,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-	);
-
-	CopyBufferToImage(
-		m_Device,
-		m_GraphicsQueue,
-		m_CommandPool,
-		StagingBuffer,
-		m_AlbedoTextureImage,
-		static_cast<uint32_t>(TexWidth),
-		static_cast<uint32_t>(TexHeight)
-	);
-
-	GenerateMipmaps(
+	CreateTextureImageFromFile(
 		m_PhysicalDevice,
 		m_Device,
 		m_CommandPool,
 		m_GraphicsQueue,
-		m_AlbedoTextureImage,
-		VK_FORMAT_R8G8B8A8_UNORM,
-		TexWidth,
-		TexHeight,
-		m_AlbedoMipLevels
+		m_NormalTexturePath.c_str(),
+		m_NormalMipLevels,
+		m_NormalTextureImage,
+		m_NormalTextureImageMemory
 	);
 
-	vkDestroyBuffer(m_Device, StagingBuffer, nullptr);
-	vkFreeMemory(m_Device, StagingBufferMemory, nullptr);
+	CreateTextureImageFromFile(
+		m_PhysicalDevice,
+		m_Device,
+		m_CommandPool,
+		m_GraphicsQueue,
+		m_MetallicTexturePath.c_str(),
+		m_MetallicMipLevels,
+		m_MetallicTextureImage,
+		m_MetallicTextureImageMemory
+	);
+
+	CreateTextureImageFromFile(
+		m_PhysicalDevice,
+		m_Device,
+		m_CommandPool,
+		m_GraphicsQueue,
+		m_RoughnessTexturePath.c_str(),
+		m_RoughnessMipLevels,
+		m_RoughnessTextureImage,
+		m_RoughnessTextureImageMemory
+	);
+
+	CreateTextureImageFromFile(
+		m_PhysicalDevice,
+		m_Device,
+		m_CommandPool,
+		m_GraphicsQueue,
+		m_AoTexturePath.c_str(),
+		m_AoMipLevels,
+		m_AoTextureImage,
+		m_AoTextureImageMemory
+	);
 }
 
 /** Vulkan Init */void App::CreateTextureImageView()
@@ -1379,6 +1397,42 @@ void App::RecreateDrawingCommandBuffer()
 		m_AlbedoMipLevels,
 		VK_IMAGE_ASPECT_COLOR_BIT,
 		m_AlbedoTextureImageView
+	);
+
+	CreateImageView(
+		m_Device,
+		m_NormalTextureImage,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		m_NormalMipLevels,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		m_NormalTextureImageView
+	);
+
+	CreateImageView(
+		m_Device,
+		m_MetallicTextureImage,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		m_MetallicMipLevels,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		m_MetallicTextureImageView
+	);
+
+	CreateImageView(
+		m_Device,
+		m_RoughnessTextureImage,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		m_RoughnessMipLevels,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		m_RoughnessTextureImageView
+	);
+
+	CreateImageView(
+		m_Device,
+		m_AoTextureImage,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		m_AoMipLevels,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		m_AoTextureImageView
 	);
 }
 
@@ -1402,7 +1456,35 @@ void App::RecreateDrawingCommandBuffer()
 	CreateInfo.minLod = 0.0f;
 	CreateInfo.maxLod = static_cast<float>(m_AlbedoMipLevels);
 
-	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_AlbedoTextureSamler) != VK_SUCCESS)
+	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_AlbedoTextureSampler) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create texture sampler!");
+	}
+
+	CreateInfo.maxLod = static_cast<float>(m_NormalMipLevels);
+
+	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_NormalTextureSampler) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create texture sampler!");
+	}
+
+	CreateInfo.maxLod = static_cast<float>(m_MetallicMipLevels);
+
+	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_MetallicTextureSampler) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create texture sampler!");
+	}
+
+	CreateInfo.maxLod = static_cast<float>(m_RoughnessMipLevels);
+
+	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_RoughnessTextureSampler) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create texture sampler!");
+	}
+
+	CreateInfo.maxLod = static_cast<float>(m_AoMipLevels);
+
+	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_AoTextureSampler) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create texture sampler!");
 	}
@@ -1410,85 +1492,68 @@ void App::RecreateDrawingCommandBuffer()
 
 void App::LoadObjModel()
 {
-	tinyobj::attrib_t Attrib;
-	std::vector<tinyobj::shape_t> Shapes;
-	std::vector<tinyobj::material_t> Materials;
-	std::string Warn, Error;
-	std::unordered_map<Vertex, uint32_t, VertexHash, VertexEqual> UniqueVertices = {};
+	Assimp::Importer Import;
+	const aiScene * pScene = Import.ReadFile(
+		m_ModelPath, 
+		aiProcess_Triangulate |
+		aiProcess_FlipUVs | 
+		aiProcess_CalcTangentSpace | 
+		aiProcess_OptimizeMeshes
+	);
+
+	if (!pScene || pScene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !pScene->mRootNode)
+	{
+		throw std::runtime_error(Import.GetErrorString());
+	}
+
+	m_VertexNum = pScene->mMeshes[0]->mNumVertices;
+	m_FacetNum = pScene->mMeshes[0]->mNumFaces;
 
 	m_Vertices.clear();
-	m_Vertices.shrink_to_fit();
 	m_Indices.clear();
-	m_Indices.shrink_to_fit();
 
-	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Error, m_ModelPath.c_str()))
-	{
-		throw std::runtime_error(Warn + Error);
-	}
+	m_Vertices.reserve(m_VertexNum);
+	m_Indices.reserve(m_FacetNum * 3);
 
-	for (const auto & Shape : Shapes)
+	for (uint32_t i = 0; i < m_VertexNum; i++)
 	{
-		for (const auto & Index : Shape.mesh.indices)
+		Vertex Vertex = {};
+
+		Vertex.Position.x = pScene->mMeshes[0]->mVertices[i].x;
+		Vertex.Position.y = pScene->mMeshes[0]->mVertices[i].y;
+		Vertex.Position.z = pScene->mMeshes[0]->mVertices[i].z;
+
+		Vertex.Color = { 1.0f, 1.0f, 1.0f };
+
+		if (pScene->mMeshes[0]->HasNormals())
 		{
-			Vertex Vertex = {};
-
-			Vertex.Position =
-			{
-				Attrib.vertices[3 * Index.vertex_index + 0],
-				Attrib.vertices[3 * Index.vertex_index + 1],
-				Attrib.vertices[3 * Index.vertex_index + 2]
-			};
-
-			if (Attrib.colors.size() != 0)
-			{
-				Vertex.Color =
-				{
-					Attrib.colors[3 * Index.vertex_index + 0],
-					Attrib.colors[3 * Index.vertex_index + 1],
-					Attrib.colors[3 * Index.vertex_index + 2]
-				};
-			}
-			else
-			{
-				Vertex.Color = { 1.0f, 1.0f, 1.0f };
-			}
-
-			if (Attrib.normals.size() != 0)
-			{
-				Vertex.Normal =
-				{
-					Attrib.normals[3 * Index.normal_index + 0],
-					Attrib.normals[3 * Index.normal_index + 1],
-					Attrib.normals[3 * Index.normal_index + 2]
-				};
-			}
-
-			if (Attrib.texcoords.size() != 0)
-			{
-				Vertex.TexCoord =
-				{
-					Attrib.texcoords[2 * Index.texcoord_index + 0],
-					Attrib.texcoords[2 * Index.texcoord_index + 1]
-				};
-			}
-
-			/**
-			 * The problem is that the origin of texture coordinates in Vulkan is the top-left corner, 
-			 * whereas the OBJ format assumes the bottom-left corner. 
-			 */
-			Vertex.TexCoord.y = 1.0f - Vertex.TexCoord.y;
-
-			if (UniqueVertices.count(Vertex) == 0)
-			{
-				UniqueVertices[Vertex] = static_cast<uint32_t>(m_Vertices.size());
-				m_Vertices.push_back(Vertex);
-			}
-			m_Indices.push_back(UniqueVertices[Vertex]);
+			Vertex.Normal.x = pScene->mMeshes[0]->mNormals[i].x;
+			Vertex.Normal.y = pScene->mMeshes[0]->mNormals[i].y;
+			Vertex.Normal.z = pScene->mMeshes[0]->mNormals[i].z;
 		}
+
+		if (pScene->mMeshes[0]->HasTangentsAndBitangents())
+		{
+			Vertex.Tangent.x = pScene->mMeshes[0]->mTangents[i].x;
+			Vertex.Tangent.y = pScene->mMeshes[0]->mTangents[i].y;
+			Vertex.Tangent.z = pScene->mMeshes[0]->mTangents[i].z;
+		}
+
+		if (pScene->mMeshes[0]->HasTextureCoords(0))
+		{
+			Vertex.TexCoord.x = pScene->mMeshes[0]->mTextureCoords[0][i].x;
+			Vertex.TexCoord.y = pScene->mMeshes[0]->mTextureCoords[0][i].y;
+		}
+
+		m_Vertices.push_back(Vertex);
 	}
 
-	m_VertexNum = m_Vertices.size();
-	m_FacetNum = m_Indices.size() / 3;
+	for (uint32_t i = 0; i < m_FacetNum; i++)
+	{
+		m_Indices.push_back(pScene->mMeshes[0]->mFaces[i].mIndices[0]);
+		m_Indices.push_back(pScene->mMeshes[0]->mFaces[i].mIndices[1]);
+		m_Indices.push_back(pScene->mMeshes[0]->mFaces[i].mIndices[2]);
+	}
 }
 
 /** Vulkan Init */void App::CreateVertexBuffer()
@@ -1630,7 +1695,7 @@ void App::CreateMaterialUniformBuffer()
 
 /** Vulkan Init */void App::CreateDescriptorPool()
 {
-	std::array<VkDescriptorPoolSize, 4> PoolSizes = {};
+	std::array<VkDescriptorPoolSize, 8> PoolSizes = {};
 	
 	PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	PoolSizes[0].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
@@ -1643,6 +1708,18 @@ void App::CreateMaterialUniformBuffer()
 
 	PoolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	PoolSizes[3].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+
+	PoolSizes[4].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	PoolSizes[4].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+
+	PoolSizes[5].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	PoolSizes[5].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+
+	PoolSizes[6].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	PoolSizes[6].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+
+	PoolSizes[7].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	PoolSizes[7].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
 
 	VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 	PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1688,12 +1765,32 @@ void App::CreateMaterialUniformBuffer()
 		MaterialBufferInfo.offset = 0;
 		MaterialBufferInfo.range = sizeof(MaterialUniformBufferObject);
 
-		VkDescriptorImageInfo ImageInfo = {};
-		ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		ImageInfo.imageView = m_AlbedoTextureImageView;
-		ImageInfo.sampler = m_AlbedoTextureSamler;
+		VkDescriptorImageInfo AlbedoImageInfo = {};
+		AlbedoImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		AlbedoImageInfo.imageView = m_AlbedoTextureImageView;
+		AlbedoImageInfo.sampler = m_AlbedoTextureSampler;
 
-		std::array<VkWriteDescriptorSet, 4> DescriptorWrites = {};
+		VkDescriptorImageInfo NormalImageInfo = {};
+		NormalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		NormalImageInfo.imageView = m_NormalTextureImageView;
+		NormalImageInfo.sampler = m_NormalTextureSampler;
+
+		VkDescriptorImageInfo MetallicImageInfo = {};
+		MetallicImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		MetallicImageInfo.imageView = m_MetallicTextureImageView;
+		MetallicImageInfo.sampler = m_MetallicTextureSampler;
+
+		VkDescriptorImageInfo RoughnessImageInfo = {};
+		RoughnessImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		RoughnessImageInfo.imageView = m_RoughnessTextureImageView;
+		RoughnessImageInfo.sampler = m_RoughnessTextureSampler;
+
+		VkDescriptorImageInfo AoImageInfo = {};
+		AoImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		AoImageInfo.imageView = m_AoTextureImageView;
+		AoImageInfo.sampler = m_AoTextureSampler;
+
+		std::array<VkWriteDescriptorSet, 8> DescriptorWrites = {};
 		
 		DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		DescriptorWrites[0].dstSet = m_DescriptorSets[i];
@@ -1732,8 +1829,48 @@ void App::CreateMaterialUniformBuffer()
 		DescriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		DescriptorWrites[3].descriptorCount = 1;
 		DescriptorWrites[3].pBufferInfo = nullptr;
-		DescriptorWrites[3].pImageInfo = &ImageInfo;
+		DescriptorWrites[3].pImageInfo = &AlbedoImageInfo;
 		DescriptorWrites[3].pTexelBufferView = nullptr;
+
+		DescriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrites[4].dstSet = m_DescriptorSets[i];
+		DescriptorWrites[4].dstBinding = 4;
+		DescriptorWrites[4].dstArrayElement = 0;
+		DescriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[4].descriptorCount = 1;
+		DescriptorWrites[4].pBufferInfo = nullptr;
+		DescriptorWrites[4].pImageInfo = &NormalImageInfo;
+		DescriptorWrites[4].pTexelBufferView = nullptr;
+
+		DescriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrites[5].dstSet = m_DescriptorSets[i];
+		DescriptorWrites[5].dstBinding = 5;
+		DescriptorWrites[5].dstArrayElement = 0;
+		DescriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[5].descriptorCount = 1;
+		DescriptorWrites[5].pBufferInfo = nullptr;
+		DescriptorWrites[5].pImageInfo = &MetallicImageInfo;
+		DescriptorWrites[5].pTexelBufferView = nullptr;
+
+		DescriptorWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrites[6].dstSet = m_DescriptorSets[i];
+		DescriptorWrites[6].dstBinding = 6;
+		DescriptorWrites[6].dstArrayElement = 0;
+		DescriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[6].descriptorCount = 1;
+		DescriptorWrites[6].pBufferInfo = nullptr;
+		DescriptorWrites[6].pImageInfo = &RoughnessImageInfo;
+		DescriptorWrites[6].pTexelBufferView = nullptr;
+
+		DescriptorWrites[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrites[7].dstSet = m_DescriptorSets[i];
+		DescriptorWrites[7].dstBinding = 7;
+		DescriptorWrites[7].dstArrayElement = 0;
+		DescriptorWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[7].descriptorCount = 1;
+		DescriptorWrites[7].pBufferInfo = nullptr;
+		DescriptorWrites[7].pImageInfo = &AoImageInfo;
+		DescriptorWrites[7].pTexelBufferView = nullptr;
 
 		vkUpdateDescriptorSets(
 			m_Device, 
@@ -2021,9 +2158,9 @@ VkVertexInputBindingDescription App::Vertex::GetBindingDescription()
 	return BindingDescription;
 }
 
-std::array<VkVertexInputAttributeDescription, 4> App::Vertex::GetAttributeDescription()
+std::array<VkVertexInputAttributeDescription, 5> App::Vertex::GetAttributeDescription()
 {
-	std::array<VkVertexInputAttributeDescription, 4> AttributeDescriptions = {};
+	std::array<VkVertexInputAttributeDescription, 5> AttributeDescriptions = {};
 
 	AttributeDescriptions[0].binding = 0;
 	AttributeDescriptions[0].location = 0;
@@ -2043,7 +2180,12 @@ std::array<VkVertexInputAttributeDescription, 4> App::Vertex::GetAttributeDescri
 	AttributeDescriptions[3].binding = 0;
 	AttributeDescriptions[3].location = 3;
 	AttributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
-	AttributeDescriptions[3].offset = offsetof(Vertex, TexCoord);
+	AttributeDescriptions[3].offset = offsetof(Vertex, Tangent);
+
+	AttributeDescriptions[4].binding = 0;
+	AttributeDescriptions[4].location = 4;
+	AttributeDescriptions[4].format = VK_FORMAT_R32G32_SFLOAT;
+	AttributeDescriptions[4].offset = offsetof(Vertex, TexCoord);
 
 	return AttributeDescriptions;
 }

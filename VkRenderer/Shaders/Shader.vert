@@ -4,6 +4,7 @@
 layout(binding = 0) uniform MvpUniformBufferObject
 {
     mat4 Model;
+    mat4 ModelInvTranspose;
     mat4 View;
     mat4 Projection;
 } Transformation;
@@ -11,22 +12,24 @@ layout(binding = 0) uniform MvpUniformBufferObject
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec3 Color;
 layout(location = 2) in vec3 Normal;
-layout(location = 3) in vec2 TexCoord;
+layout(location = 3) in vec3 Tangent;
+layout(location = 4) in vec2 TexCoord;
 
-layout(location = 0) out vec4 FragPosition;
+layout(location = 0) out vec4 FragPositionH;
 layout(location = 1) out vec3 FragColor;
-layout(location = 2) out vec3 FragNormal;
-layout(location = 3) out vec2 FragTexCoord;
-layout(location = 4) out vec3 FragPositionW;
+layout(location = 2) out vec2 FragTexCoord;
+layout(location = 3) out vec3 FragPositionW;
+layout(location = 4) out vec3 FragNormalW;
+layout(location = 5) out vec3 FragTangentW;
 
 void main()
 {
-    FragPosition = Transformation.Projection * Transformation.View * Transformation.Model * vec4(Position, 1.0);
+    FragPositionH = Transformation.Projection * Transformation.View * Transformation.Model * vec4(Position, 1.0);
     FragColor = Color;
-    FragNormal = mat3(Transformation.Model) * Normal;
     FragTexCoord = TexCoord;
     FragPositionW = (Transformation.Model * vec4(Position, 1.0)).xyz;
-
-    gl_Position = FragPosition;
+    FragNormalW = (Transformation.ModelInvTranspose * vec4(Normal, 1.0)).xyz;
+    FragTangentW = (Transformation.Model * vec4(Tangent, 1.0)).xyz;
+    gl_Position = FragPositionH;
 }
 

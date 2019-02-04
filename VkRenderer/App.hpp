@@ -173,7 +173,7 @@ protected: /** App */
 	GLFWwindow * m_pWindow = nullptr;
 	uint32_t m_InitWidth = WINDOW_INIT_WIDTH;
 	uint32_t m_InitHeight = WINDOW_INIT_HEIGH;
-	std::string m_Title = "Vulkan";
+	std::string m_Title = "VkRenderer";
 	std::string m_AppName = "VulkanApp";
 	std::string m_EngineName = "VulkanEngine";
 	std::string m_GpuName = "";
@@ -279,10 +279,11 @@ protected: /** Mesh */
 		glm::vec3 Position;
 		glm::vec3 Color;
 		glm::vec3 Normal;
+		glm::vec3 Tangent;
 		glm::vec2 TexCoord;
 
 		static VkVertexInputBindingDescription GetBindingDescription();
-		static std::array<VkVertexInputAttributeDescription, 4> GetAttributeDescription();
+		static std::array<VkVertexInputAttributeDescription, 5> GetAttributeDescription();
 	};
 
 	struct VertexHash
@@ -311,6 +312,7 @@ protected: /** UBO */
 	struct MvpUniformBufferObject
 	{
 		alignas(16) glm::mat4 Model;
+		alignas(16) glm::mat4 ModelInvTranspose;
 		alignas(16) glm::mat4 View;
 		alignas(16) glm::mat4 Projection;
 	};
@@ -348,7 +350,35 @@ protected: /** Texture */
 	VkImage m_AlbedoTextureImage = VK_NULL_HANDLE;
 	VkDeviceMemory m_AlbedoTextureImageMemory = VK_NULL_HANDLE;
 	VkImageView m_AlbedoTextureImageView = VK_NULL_HANDLE;
-	VkSampler m_AlbedoTextureSamler = VK_NULL_HANDLE;
+	VkSampler m_AlbedoTextureSampler = VK_NULL_HANDLE;
+
+	const std::string m_NormalTexturePath = "Textures/Cerberus/Cerberus_N.png";
+	uint32_t m_NormalMipLevels = 0;
+	VkImage m_NormalTextureImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_NormalTextureImageMemory = VK_NULL_HANDLE;
+	VkImageView m_NormalTextureImageView = VK_NULL_HANDLE;
+	VkSampler m_NormalTextureSampler = VK_NULL_HANDLE;
+
+	const std::string m_MetallicTexturePath = "Textures/Cerberus/Cerberus_M.png";
+	uint32_t m_MetallicMipLevels = 0;
+	VkImage m_MetallicTextureImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_MetallicTextureImageMemory = VK_NULL_HANDLE;
+	VkImageView m_MetallicTextureImageView = VK_NULL_HANDLE;
+	VkSampler m_MetallicTextureSampler = VK_NULL_HANDLE;
+
+	const std::string m_RoughnessTexturePath = "Textures/Cerberus/Cerberus_R.png";
+	uint32_t m_RoughnessMipLevels = 0;
+	VkImage m_RoughnessTextureImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_RoughnessTextureImageMemory = VK_NULL_HANDLE;
+	VkImageView m_RoughnessTextureImageView = VK_NULL_HANDLE;
+	VkSampler m_RoughnessTextureSampler = VK_NULL_HANDLE;
+
+	const std::string m_AoTexturePath = "Textures/Cerberus/Cerberus_AO.png";
+	uint32_t m_AoMipLevels = 0;
+	VkImage m_AoTextureImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_AoTextureImageMemory = VK_NULL_HANDLE;
+	VkImageView m_AoTextureImageView = VK_NULL_HANDLE;
+	VkSampler m_AoTextureSampler = VK_NULL_HANDLE;
 
 protected: /** Camera */
 	Camera m_Camera;

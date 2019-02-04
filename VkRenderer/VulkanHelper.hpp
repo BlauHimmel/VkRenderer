@@ -190,6 +190,17 @@ VkSampleCountFlagBits GetMaxUsableSampleCount(
 	VkPhysicalDevice Device
 );
 
+void CreateTextureImageFromFile(
+	VkPhysicalDevice PhysicalDevice,
+	VkDevice Device,
+	VkCommandPool CommandPool,
+	VkQueue Queue,
+	const char * pFilename,
+	uint32_t & MipLevels,
+	VkImage & TextureImage,
+	VkDeviceMemory & TextureImageMemory
+);
+
 namespace ProxyVulkanFunction
 {
 
