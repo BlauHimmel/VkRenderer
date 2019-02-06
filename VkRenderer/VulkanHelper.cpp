@@ -16,6 +16,20 @@ bool QueueFamilyIndices::IsComplete() const
 	return GraphicsFamily.has_value() && PresentFamily.has_value();
 }
 
+size_t SwapChainInfo::BufferCount() const
+{
+	return SwapChainImages.size();
+}
+
+VkDescriptorImageInfo TextureInfo::GetDescriptorImageInfo() const
+{
+	VkDescriptorImageInfo ImageInfo = {};
+	ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	ImageInfo.imageView = TextureImageView;
+	ImageInfo.sampler = TextureSampler;
+	return ImageInfo;
+}
+
 bool CheckValidationLayerSupport(
 	const std::vector<const char *> & Layers
 )
@@ -365,8 +379,7 @@ void CreateBuffer(
 	VkDeviceSize Size,
 	VkBufferUsageFlags Usage,
 	VkMemoryPropertyFlags Properties,
-	VkBuffer & Buffer,
-	VkDeviceMemory & BufferMemory
+	BufferInfo & Buffer
 )
 {
 	VkBufferCreateInfo BufferCreateInfo = {};
@@ -375,33 +388,33 @@ void CreateBuffer(
 	BufferCreateInfo.usage = Usage;
 	BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	if (vkCreateBuffer(Device, &BufferCreateInfo, nullptr, &Buffer) != VK_SUCCESS)
+	if (vkCreateBuffer(Device, &BufferCreateInfo, nullptr, &Buffer.Buffer) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create vertex buffer!");
 	}
 
 	VkMemoryRequirements MemoryRequirements;
-	vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
+	vkGetBufferMemoryRequirements(Device, Buffer.Buffer, &MemoryRequirements);
 
 	VkMemoryAllocateInfo AllocInfo = {};
 	AllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	AllocInfo.allocationSize = MemoryRequirements.size;
 	AllocInfo.memoryTypeIndex = FindMemoryType(PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
 
-	if (vkAllocateMemory(Device, &AllocInfo, nullptr, &BufferMemory) != VK_SUCCESS)
+	if (vkAllocateMemory(Device, &AllocInfo, nullptr, &Buffer.Memory) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to allocate vertex buffer memory!");
 	}
 
-	vkBindBufferMemory(Device, Buffer, BufferMemory, 0);
+	vkBindBufferMemory(Device, Buffer.Buffer, Buffer.Memory, 0);
 }
 
 void CopyBuffer(
 	VkDevice Device,
 	VkCommandPool CommandPool,
 	VkQueue Queue,
-	VkBuffer SrcBuffer,
-	VkBuffer DstBuffer,
+	BufferInfo SrcBuffer,
+	BufferInfo DstBuffer,
 	VkDeviceSize Size
 )
 {
@@ -411,7 +424,7 @@ void CopyBuffer(
 	CopyRegion.srcOffset = 0;
 	CopyRegion.dstOffset = 0;
 	CopyRegion.size = Size;
-	vkCmdCopyBuffer(CommandBuffer, SrcBuffer, DstBuffer, 1, &CopyRegion);
+	vkCmdCopyBuffer(CommandBuffer, SrcBuffer.Buffer, DstBuffer.Buffer, 1, &CopyRegion);
 
 	EndSingleTimeCommands(Device, Queue, CommandPool, CommandBuffer);
 }
@@ -827,11 +840,16 @@ void CreateTextureImageFromFile(
 
 	if (pPixels == nullptr)
 	{
-		throw std::runtime_error("Failed to load texture image!");
+		pPixels = (stbi_uc *)(malloc(sizeof(stbi_uc) * 4));
+		pPixels[0] = 255; pPixels[1] = 255; pPixels[2] = 255; pPixels[3] = 255;
+		TexWidth = 1;
+		TexHeight = 1;
+		TexChannels = 4;
+		ImageSize = 4;
+		MipLevels = 1;
 	}
 
-	VkBuffer StagingBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory StagingBufferMemory = VK_NULL_HANDLE;
+	BufferInfo StagingBuffer;
 
 	CreateBuffer(
 		PhysicalDevice,
@@ -839,14 +857,10 @@ void CreateTextureImageFromFile(
 		ImageSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		StagingBuffer,
-		StagingBufferMemory
+		StagingBuffer
 	);
 
-	void * pData = nullptr;
-	vkMapMemory(Device, StagingBufferMemory, 0, ImageSize, 0, &pData);
-	memcpy(pData, pPixels, static_cast<size_t>(ImageSize));
-	vkUnmapMemory(Device, StagingBufferMemory);
+	MapMemory(Device, StagingBuffer.Memory, ImageSize, pPixels);
 
 	stbi_image_free(pPixels);
 
@@ -882,7 +896,7 @@ void CreateTextureImageFromFile(
 		Device,
 		Queue,
 		CommandPool,
-		StagingBuffer,
+		StagingBuffer.Buffer,
 		TextureImage,
 		static_cast<uint32_t>(TexWidth),
 		static_cast<uint32_t>(TexHeight)
@@ -900,8 +914,93 @@ void CreateTextureImageFromFile(
 		MipLevels
 	);
 
-	vkDestroyBuffer(Device, StagingBuffer, nullptr);
-	vkFreeMemory(Device, StagingBufferMemory, nullptr);
+	DestroyBuffer(Device, StagingBuffer);
+}
+
+void CreateTextureFromFile(
+	VkPhysicalDevice PhysicalDevice,
+	VkDevice Device,
+	VkCommandPool CommandPool,
+	VkQueue Queue,
+	const char * pFilename,
+	TextureInfo & Texture
+)
+{
+	CreateTextureImageFromFile(
+		PhysicalDevice,
+		Device,
+		CommandPool,
+		Queue,
+		pFilename,
+		Texture.MipLevels,
+		Texture.TextureImage,
+		Texture.TextureImageMemory
+	);
+
+	CreateImageView(
+		Device,
+		Texture.TextureImage,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		Texture.MipLevels,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		Texture.TextureImageView
+	);
+
+	VkSamplerCreateInfo CreateInfo = {};
+	CreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	CreateInfo.magFilter = VK_FILTER_LINEAR;
+	CreateInfo.minFilter = VK_FILTER_LINEAR;
+	CreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	CreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	CreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	CreateInfo.anisotropyEnable = VK_TRUE;
+	CreateInfo.maxAnisotropy = 16;
+	CreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	CreateInfo.unnormalizedCoordinates = VK_FALSE;
+	CreateInfo.compareEnable = VK_FALSE;
+	CreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	CreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	CreateInfo.mipLodBias = 0.0f;
+	CreateInfo.minLod = 0.0f;
+	CreateInfo.maxLod = static_cast<float>(Texture.MipLevels);
+
+	if (vkCreateSampler(Device, &CreateInfo, nullptr, &Texture.TextureSampler) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create texture sampler!");
+	}
+}
+
+void DestroyTexture(
+	VkDevice Device,
+	TextureInfo & Texture
+)
+{
+	vkDestroySampler(Device, Texture.TextureSampler, nullptr);
+	vkDestroyImageView(Device, Texture.TextureImageView, nullptr);
+	vkDestroyImage(Device, Texture.TextureImage, nullptr);
+	vkFreeMemory(Device, Texture.TextureImageMemory, nullptr);
+}
+
+void DestroyBuffer(
+	VkDevice Device,
+	BufferInfo & Buffer
+)
+{
+	vkDestroyBuffer(Device, Buffer.Buffer, nullptr);
+	vkFreeMemory(Device, Buffer.Memory, nullptr);
+}
+
+void MapMemory(
+	VkDevice Device,
+	VkDeviceMemory Memory,
+	VkDeviceSize Size,
+	void * pData
+)
+{
+	void * pMappedData = nullptr;
+	vkMapMemory(Device, Memory, 0, Size, 0, &pMappedData);
+	memcpy(pMappedData, pData, Size);
+	vkUnmapMemory(Device, Memory);
 }
 
 NAMESPACE_BEGIN(ProxyVulkanFunction)

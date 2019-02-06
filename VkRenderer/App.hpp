@@ -29,6 +29,7 @@
 
 #include "Namespace.hpp"
 #include "Camera.hpp"
+#include "VulkanHelper.hpp"
 
 //TODO :
 //    1. Update the vertex/index buffer while the app is running.
@@ -98,11 +99,7 @@ protected:
 
 	/** Vulkan Init */void CreateFramebuffers();
 
-	/** Vulkan Init */void LoadAndCreateTextureImage();
-
-	/** Vulkan Init */void CreateTextureImageView();
-
-	/** Vulkan Init */void CreateTextureSampler();
+	/** Vulkan Init */void LoadAndCreateTextures();
 
 	/** Vulkan Init */void LoadObjModel();
 
@@ -182,7 +179,7 @@ protected: /** App */
 
 protected: /** Vulkan pipeline */
 #ifdef NDEBUG
-		const bool m_bEnableValidationLayers = false;
+		const bool m_bEnableValidationLayers = true;
 #else
 		const bool m_bEnableValidationLayers = true;
 #endif
@@ -211,19 +208,7 @@ protected: /** Vulkan pipeline */
 	VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
 	VkQueue m_PresentQueue = VK_NULL_HANDLE;
 
-	VkSampleCountFlagBits m_MsaaSamples = VK_SAMPLE_COUNT_1_BIT;
-	VkImage m_ColorImage = VK_NULL_HANDLE;
-	VkDeviceMemory m_ColorImageMemory = VK_NULL_HANDLE;
-	VkImageView m_ColorImageView = VK_NULL_HANDLE;
-
-	VkSwapchainKHR m_SwapChain = VK_NULL_HANDLE;
-	/** The images were created by the implementation for the swap chain and
-	* they will be automatically cleaned up once the swap chain has been destroyed.
-	*/
-	std::vector<VkImage> m_SwapChainImages;
-	std::vector<VkImageView> m_SwapChainImageViews;
-	VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
-	VkExtent2D m_SwapChainExtent = { 0, 0 };
+	SwapChainInfo m_SwapChainInfo;
 
 	VkRenderPass m_RenderPass = VK_NULL_HANDLE;
 	VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
@@ -256,12 +241,6 @@ protected: /** Vulkan pipeline */
 	std::unordered_map<int, VkPipeline> m_GraphicsPipelines;
 	int m_GraphicsPipelineDisplayMode = GRAPHICS_PIPELINE_TYPE_FILL;
 	int m_GraphicsPipelineCullMode = GRAPHICS_PIPELINE_TYPE_NONE_CULL;
-
-	VkImage m_DepthImage = VK_NULL_HANDLE;
-	VkDeviceMemory m_DepthImageMemory = VK_NULL_HANDLE;
-	VkImageView m_DepthImageView = VK_NULL_HANDLE;
-
-	std::vector<VkFramebuffer> m_SwapChainFramebuffers;
 
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 	/** Command buffers will be automatically freed when their command pool is destroyed. */
@@ -303,10 +282,8 @@ protected: /** Mesh */
 	size_t m_VertexNum = 0;
 	size_t m_FacetNum = 0;
 
-	VkBuffer m_VertexBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory m_VertexBufferMemory = VK_NULL_HANDLE;
-	VkBuffer m_IndexBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory m_IndexBufferMemory = VK_NULL_HANDLE;
+	BufferInfo m_VertexBuffer;
+	BufferInfo m_IndexBuffer;
 
 protected: /** UBO */
 	struct MvpUniformBufferObject
@@ -334,51 +311,29 @@ protected: /** UBO */
 	};
 
 	VkDescriptorSetLayout m_DescriptorSetLayout = VK_NULL_HANDLE;
-	std::vector<VkBuffer> m_MvpUniformBuffers;
-	std::vector<VkDeviceMemory> m_MvpUniformBufferMemories;
-	std::vector<VkBuffer> m_LightUniformBuffers;
-	std::vector<VkDeviceMemory> m_LightUniformBufferMemories;
-	std::vector<VkBuffer> m_MaterialUniformBuffers;
-	std::vector<VkDeviceMemory> m_MaterialUniformBufferMemories;
+	std::vector<BufferInfo> m_MvpUniformBuffers;
+	std::vector<BufferInfo> m_LightUniformBuffers;
+	std::vector<BufferInfo> m_MaterialUniformBuffers;
+
 	VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
 	/** Descriptor sets will be automatically freed when the descriptor pool is destroyed. */
 	std::vector<VkDescriptorSet> m_DescriptorSets;
 
 protected: /** Texture */
 	const std::string m_AlbedoTexturePath = "Textures/Cerberus/Cerberus_A.png";
-	uint32_t m_AlbedoMipLevels = 0;
-	VkImage m_AlbedoTextureImage = VK_NULL_HANDLE;
-	VkDeviceMemory m_AlbedoTextureImageMemory = VK_NULL_HANDLE;
-	VkImageView m_AlbedoTextureImageView = VK_NULL_HANDLE;
-	VkSampler m_AlbedoTextureSampler = VK_NULL_HANDLE;
+	TextureInfo m_AlbedoTexture;
 
 	const std::string m_NormalTexturePath = "Textures/Cerberus/Cerberus_N.png";
-	uint32_t m_NormalMipLevels = 0;
-	VkImage m_NormalTextureImage = VK_NULL_HANDLE;
-	VkDeviceMemory m_NormalTextureImageMemory = VK_NULL_HANDLE;
-	VkImageView m_NormalTextureImageView = VK_NULL_HANDLE;
-	VkSampler m_NormalTextureSampler = VK_NULL_HANDLE;
+	TextureInfo m_NormalTexture;
 
 	const std::string m_MetallicTexturePath = "Textures/Cerberus/Cerberus_M.png";
-	uint32_t m_MetallicMipLevels = 0;
-	VkImage m_MetallicTextureImage = VK_NULL_HANDLE;
-	VkDeviceMemory m_MetallicTextureImageMemory = VK_NULL_HANDLE;
-	VkImageView m_MetallicTextureImageView = VK_NULL_HANDLE;
-	VkSampler m_MetallicTextureSampler = VK_NULL_HANDLE;
+	TextureInfo m_MetallicTexture;
 
 	const std::string m_RoughnessTexturePath = "Textures/Cerberus/Cerberus_R.png";
-	uint32_t m_RoughnessMipLevels = 0;
-	VkImage m_RoughnessTextureImage = VK_NULL_HANDLE;
-	VkDeviceMemory m_RoughnessTextureImageMemory = VK_NULL_HANDLE;
-	VkImageView m_RoughnessTextureImageView = VK_NULL_HANDLE;
-	VkSampler m_RoughnessTextureSampler = VK_NULL_HANDLE;
+	TextureInfo m_RoughnessTexture;
 
 	const std::string m_AoTexturePath = "Textures/Cerberus/Cerberus_AO.png";
-	uint32_t m_AoMipLevels = 0;
-	VkImage m_AoTextureImage = VK_NULL_HANDLE;
-	VkDeviceMemory m_AoTextureImageMemory = VK_NULL_HANDLE;
-	VkImageView m_AoTextureImageView = VK_NULL_HANDLE;
-	VkSampler m_AoTextureSampler = VK_NULL_HANDLE;
+	TextureInfo m_AoTexture;
 
 protected: /** Camera */
 	Camera m_Camera;

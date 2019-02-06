@@ -5,9 +5,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -20,8 +17,6 @@
 #include <memory>
 #include <exception>
 #include <stdexcept>
-
-#include "VulkanHelper.hpp"
 
 NAMESPACE_BEGIN(GLOBAL_NAMESPACE)
 
@@ -79,11 +74,7 @@ void App::Run()
 
 	CreateFramebuffers();
 
-	LoadAndCreateTextureImage();
-
-	CreateTextureImageView();
-
-	CreateTextureSampler();
+	LoadAndCreateTextures();
 
 	LoadObjModel();
 
@@ -163,7 +154,8 @@ void App::Run()
 
 	uint32_t ImageIndex;
 	VkResult Result = vkAcquireNextImageKHR(
-		m_Device, m_SwapChain, 
+		m_Device, 
+		m_SwapChainInfo.SwapChain,
 		std::numeric_limits<uint64_t>::max(), 
 		m_ImageAvailableSemaphores[m_CurrentFrame], 
 		VK_NULL_HANDLE, 
@@ -209,7 +201,7 @@ void App::Run()
 	PresentInfo.waitSemaphoreCount = 1;
 	PresentInfo.pWaitSemaphores = SignalSemaphores;
 
-	VkSwapchainKHR SwapChains[] = { m_SwapChain };
+	VkSwapchainKHR SwapChains[] = { m_SwapChainInfo.SwapChain };
 	PresentInfo.swapchainCount = 1;
 	PresentInfo.pSwapchains = SwapChains;
 	PresentInfo.pImageIndices = &ImageIndex;
@@ -246,54 +238,29 @@ void App::Run()
 
 	vkDestroyDescriptorSetLayout(m_Device, m_DescriptorSetLayout, nullptr);
 
-	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
-		vkDestroyBuffer(m_Device, m_MaterialUniformBuffers[i], nullptr);
-		vkFreeMemory(m_Device, m_MaterialUniformBufferMemories[i], nullptr);
+		DestroyBuffer(m_Device, m_MaterialUniformBuffers[i]);
 	}
 
-	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
-		vkDestroyBuffer(m_Device, m_LightUniformBuffers[i], nullptr);
-		vkFreeMemory(m_Device, m_LightUniformBufferMemories[i], nullptr);
+		DestroyBuffer(m_Device, m_LightUniformBuffers[i]);
 	}
 
-	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
-		vkDestroyBuffer(m_Device, m_MvpUniformBuffers[i], nullptr);
-		vkFreeMemory(m_Device, m_MvpUniformBufferMemories[i], nullptr);
+		DestroyBuffer(m_Device, m_MvpUniformBuffers[i]);
 	}
 
-	vkDestroyBuffer(m_Device, m_IndexBuffer, nullptr);
-	vkFreeMemory(m_Device, m_IndexBufferMemory, nullptr);
+	DestroyBuffer(m_Device, m_IndexBuffer);
+	DestroyBuffer(m_Device, m_VertexBuffer);
 
-	vkDestroyBuffer(m_Device, m_VertexBuffer, nullptr);
-	vkFreeMemory(m_Device, m_VertexBufferMemory, nullptr);
-
-	vkDestroySampler(m_Device, m_AoTextureSampler, nullptr);
-	vkDestroyImageView(m_Device, m_AoTextureImageView, nullptr);
-	vkDestroyImage(m_Device, m_AoTextureImage, nullptr);
-	vkFreeMemory(m_Device, m_AoTextureImageMemory, nullptr);
-
-	vkDestroySampler(m_Device, m_RoughnessTextureSampler, nullptr);
-	vkDestroyImageView(m_Device, m_RoughnessTextureImageView, nullptr);
-	vkDestroyImage(m_Device, m_RoughnessTextureImage, nullptr);
-	vkFreeMemory(m_Device, m_RoughnessTextureImageMemory, nullptr);
-
-	vkDestroySampler(m_Device, m_MetallicTextureSampler, nullptr);
-	vkDestroyImageView(m_Device, m_MetallicTextureImageView, nullptr);
-	vkDestroyImage(m_Device, m_MetallicTextureImage, nullptr);
-	vkFreeMemory(m_Device, m_MetallicTextureImageMemory, nullptr);
-
-	vkDestroySampler(m_Device, m_NormalTextureSampler, nullptr);
-	vkDestroyImageView(m_Device, m_NormalTextureImageView, nullptr);
-	vkDestroyImage(m_Device, m_NormalTextureImage, nullptr);
-	vkFreeMemory(m_Device, m_NormalTextureImageMemory, nullptr);
-
-	vkDestroySampler(m_Device, m_AlbedoTextureSampler, nullptr);
-	vkDestroyImageView(m_Device, m_AlbedoTextureImageView, nullptr);
-	vkDestroyImage(m_Device, m_AlbedoTextureImage, nullptr);
-	vkFreeMemory(m_Device, m_AlbedoTextureImageMemory, nullptr);
+	DestroyTexture(m_Device, m_AoTexture);
+	DestroyTexture(m_Device, m_RoughnessTexture);
+	DestroyTexture(m_Device, m_MetallicTexture);
+	DestroyTexture(m_Device, m_NormalTexture);
+	DestroyTexture(m_Device, m_AlbedoTexture);
 
 	vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
 	
@@ -335,17 +302,14 @@ void App::Run()
 	Transformation.View = glm::lookAt(Eye, Target, Up);
 	Transformation.Projection = glm::perspective(
 		Fov.y,
-		static_cast<float>(m_SwapChainExtent.width) / static_cast<float>(m_SwapChainExtent.height), 
+		static_cast<float>(m_SwapChainInfo.SwapChainExtent.width) / static_cast<float>(m_SwapChainInfo.SwapChainExtent.height),
 		NearZ, 
 		FarZ
 	);
 	/** GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates is inverted */
 	Transformation.Projection[1][1] *= -1.0f;
 
-	void * pData = nullptr;
-	vkMapMemory(m_Device, m_MvpUniformBufferMemories[CurrentImage], 0, sizeof(Transformation), 0, &pData);
-	memcpy(pData, &Transformation, sizeof(Transformation));
-	vkUnmapMemory(m_Device, m_MvpUniformBufferMemories[CurrentImage]);
+	MapMemory(m_Device, m_MvpUniformBuffers[CurrentImage].Memory, sizeof(Transformation), &Transformation);
 
 	/** Update light information */
 	LightUniformBufferObject Lighting = {};
@@ -367,10 +331,7 @@ void App::Run()
 	Lighting.LightColor[7] = glm::vec4(38.0f, 38.0f, 38.0f, 1.0f);
 	Lighting.ViewPosition = m_Camera.GetCachedEye();
 
-	pData = nullptr;
-	vkMapMemory(m_Device, m_LightUniformBufferMemories[CurrentImage], 0, sizeof(Lighting), 0, &pData);
-	memcpy(pData, &Lighting, sizeof(Lighting));
-	vkUnmapMemory(m_Device, m_LightUniformBufferMemories[CurrentImage]);
+	MapMemory(m_Device, m_LightUniformBuffers[CurrentImage].Memory, sizeof(Lighting), &Lighting);
 
 	/** Update material information */
 	MaterialUniformBufferObject Material = {};
@@ -379,10 +340,7 @@ void App::Run()
 	Material.Metallic = 1.0f;
 	Material.Roughness = 1.0f;
 
-	pData = nullptr;
-	vkMapMemory(m_Device, m_MaterialUniformBufferMemories[CurrentImage], 0, sizeof(Material), 0, &pData);
-	memcpy(pData, &Material, sizeof(Material));
-	vkUnmapMemory(m_Device, m_MaterialUniformBufferMemories[CurrentImage]);
+	MapMemory(m_Device, m_MaterialUniformBuffers[CurrentImage].Memory, sizeof(Material), &Material);
 }
 
 /** App Helper */void App::RecreateSwapChainAndRelevantObject()
@@ -417,15 +375,15 @@ void App::Run()
 
 /** App Helper */void App::DestroySwapChainAndRelevantObject()
 {
-	vkDestroyImageView(m_Device, m_DepthImageView, nullptr);
-	vkDestroyImage(m_Device, m_DepthImage, nullptr);
-	vkFreeMemory(m_Device, m_DepthImageMemory, nullptr);
+	vkDestroyImageView(m_Device, m_SwapChainInfo.DepthImageView, nullptr);
+	vkDestroyImage(m_Device, m_SwapChainInfo.DepthImage, nullptr);
+	vkFreeMemory(m_Device, m_SwapChainInfo.DepthImageMemory, nullptr);
 
-	vkDestroyImageView(m_Device, m_ColorImageView, nullptr);
-	vkDestroyImage(m_Device, m_ColorImage, nullptr);
-	vkFreeMemory(m_Device, m_ColorImageMemory, nullptr);
+	vkDestroyImageView(m_Device, m_SwapChainInfo.ColorImageView, nullptr);
+	vkDestroyImage(m_Device, m_SwapChainInfo.ColorImage, nullptr);
+	vkFreeMemory(m_Device, m_SwapChainInfo.ColorImageMemory, nullptr);
 
-	for (auto & Framebuffer : m_SwapChainFramebuffers)
+	for (auto & Framebuffer : m_SwapChainInfo.SwapChainFramebuffers)
 	{
 		vkDestroyFramebuffer(m_Device, Framebuffer, nullptr);
 	}
@@ -439,12 +397,12 @@ void App::Run()
 
 	vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
 
-	for (auto & SwapChainImageView : m_SwapChainImageViews)
+	for (auto & SwapChainImageView : m_SwapChainInfo.SwapChainImageViews)
 	{
 		vkDestroyImageView(m_Device, SwapChainImageView, nullptr);
 	}
 
-	vkDestroySwapchainKHR(m_Device, m_SwapChain, nullptr);
+	vkDestroySwapchainKHR(m_Device, m_SwapChainInfo.SwapChain, nullptr);
 
 	vkFreeCommandBuffers(
 		m_Device, 
@@ -586,7 +544,7 @@ void App::RecreateDrawingCommandBuffer()
 			if (Memory > MaxMemory)
 			{
 				m_PhysicalDevice = PhysicalDevices[i];
-				m_MsaaSamples = GetMaxUsableSampleCount(PhysicalDevices[i]);
+				m_SwapChainInfo.MsaaSamples = GetMaxUsableSampleCount(PhysicalDevices[i]);
 				m_GpuName = PhysicalDeviceProperties.deviceName;
 				MaxMemory = Memory;
 			}
@@ -703,31 +661,31 @@ void App::RecreateDrawingCommandBuffer()
 	CreateInfo.clipped = VK_TRUE;
 	CreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-	if (vkCreateSwapchainKHR(m_Device, &CreateInfo, nullptr, &m_SwapChain) != VK_SUCCESS)
+	if (vkCreateSwapchainKHR(m_Device, &CreateInfo, nullptr, &m_SwapChainInfo.SwapChain) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create swap chain!");
 	}
 
-	vkGetSwapchainImagesKHR(m_Device, m_SwapChain, &ImageCount, nullptr);
-	m_SwapChainImages.resize(ImageCount);
-	vkGetSwapchainImagesKHR(m_Device, m_SwapChain, &ImageCount, m_SwapChainImages.data());
+	vkGetSwapchainImagesKHR(m_Device, m_SwapChainInfo.SwapChain, &ImageCount, nullptr);
+	m_SwapChainInfo.SwapChainImages.resize(ImageCount);
+	vkGetSwapchainImagesKHR(m_Device, m_SwapChainInfo.SwapChain, &ImageCount, m_SwapChainInfo.SwapChainImages.data());
 
-	m_SwapChainImageFormat = SurfaceFormat.format;
-	m_SwapChainExtent = Extent;
+	m_SwapChainInfo.SwapChainImageFormat = SurfaceFormat.format;
+	m_SwapChainInfo.SwapChainExtent = Extent;
 }
 
 /** Vulkan Init */void App::CreateSwapChainImageViews()
 {
-	m_SwapChainImageViews.resize(m_SwapChainImages.size());
-	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	m_SwapChainInfo.SwapChainImageViews.resize(m_SwapChainInfo.SwapChainImages.size());
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
 		CreateImageView(
 			m_Device, 
-			m_SwapChainImages[i], 
-			m_SwapChainImageFormat, 
+			m_SwapChainInfo.SwapChainImages[i],
+			m_SwapChainInfo.SwapChainImageFormat,
 			1,
 			VK_IMAGE_ASPECT_COLOR_BIT,
-			m_SwapChainImageViews[i]
+			m_SwapChainInfo.SwapChainImageViews[i]
 		);
 	}
 }
@@ -735,8 +693,8 @@ void App::RecreateDrawingCommandBuffer()
 /** Vulkan Init */void App::CreateRenderPass()
 {
 	VkAttachmentDescription ColorAttachment = {};
-	ColorAttachment.format = m_SwapChainImageFormat;
-	ColorAttachment.samples = m_MsaaSamples;
+	ColorAttachment.format = m_SwapChainInfo.SwapChainImageFormat;
+	ColorAttachment.samples = m_SwapChainInfo.MsaaSamples;
 	ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	ColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -746,7 +704,7 @@ void App::RecreateDrawingCommandBuffer()
 
 	VkAttachmentDescription DepthAttachment = {};
 	DepthAttachment.format = FindDepthFormat(m_PhysicalDevice);
-	DepthAttachment.samples = m_MsaaSamples;
+	DepthAttachment.samples = m_SwapChainInfo.MsaaSamples;
 	DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	DepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -755,7 +713,7 @@ void App::RecreateDrawingCommandBuffer()
 	DepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentDescription ColorAttachmentResolve = {};
-	ColorAttachmentResolve.format = m_SwapChainImageFormat;
+	ColorAttachmentResolve.format = m_SwapChainInfo.SwapChainImageFormat;
 	ColorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
 	ColorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	ColorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -945,14 +903,14 @@ void App::RecreateDrawingCommandBuffer()
 	VkViewport Viewport = {};
 	Viewport.x = 0.0f;
 	Viewport.y = 0.0f;
-	Viewport.width = static_cast<float>(m_SwapChainExtent.width);
-	Viewport.height = static_cast<float>(m_SwapChainExtent.height);
+	Viewport.width = static_cast<float>(m_SwapChainInfo.SwapChainExtent.width);
+	Viewport.height = static_cast<float>(m_SwapChainInfo.SwapChainExtent.height);
 	Viewport.minDepth = 0.0f;
 	Viewport.maxDepth = 1.0f;
 
 	VkRect2D Scissor = {};
 	Scissor.offset = { 0, 0 };
-	Scissor.extent = m_SwapChainExtent;
+	Scissor.extent = m_SwapChainInfo.SwapChainExtent;
 
 	VkPipelineViewportStateCreateInfo ViewportStateCreateInfo = {};
 	ViewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -979,7 +937,7 @@ void App::RecreateDrawingCommandBuffer()
 	VkPipelineMultisampleStateCreateInfo MultisampleStateCreateInfo = {};
 	MultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	MultisampleStateCreateInfo.sampleShadingEnable = VK_TRUE;
-	MultisampleStateCreateInfo.rasterizationSamples = m_MsaaSamples;
+	MultisampleStateCreateInfo.rasterizationSamples = m_SwapChainInfo.MsaaSamples;
 	MultisampleStateCreateInfo.minSampleShading = 1.0f;
 	MultisampleStateCreateInfo.pSampleMask = nullptr;
 	MultisampleStateCreateInfo.alphaToCoverageEnable = VK_FALSE;
@@ -1224,37 +1182,37 @@ void App::RecreateDrawingCommandBuffer()
 
 /** Vulkan Init */void App::CreateColorResource()
 {
-	VkFormat ColorFormat = m_SwapChainImageFormat;
+	VkFormat ColorFormat = m_SwapChainInfo.SwapChainImageFormat;
 
 	CreateImage(
 		m_PhysicalDevice,
 		m_Device,
-		m_SwapChainExtent.width,
-		m_SwapChainExtent.height,
+		m_SwapChainInfo.SwapChainExtent.width,
+		m_SwapChainInfo.SwapChainExtent.height,
 		1,
-		m_MsaaSamples,
+		m_SwapChainInfo.MsaaSamples,
 		ColorFormat,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_ColorImage,
-		m_ColorImageMemory
+		m_SwapChainInfo.ColorImage,
+		m_SwapChainInfo.ColorImageMemory
 	);
 
 	CreateImageView(
 		m_Device, 
-		m_ColorImage,
+		m_SwapChainInfo.ColorImage,
 		ColorFormat, 
 		1, 
 		VK_IMAGE_ASPECT_COLOR_BIT,
-		m_ColorImageView
+		m_SwapChainInfo.ColorImageView
 	);
 
 	TransitionImageLayout(
 		m_Device,
 		m_GraphicsQueue,
 		m_CommandPool,
-		m_ColorImage,
+		m_SwapChainInfo.ColorImage,
 		ColorFormat,
 		1,
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -1268,32 +1226,32 @@ void App::RecreateDrawingCommandBuffer()
 	CreateImage(
 		m_PhysicalDevice,
 		m_Device,
-		m_SwapChainExtent.width,
-		m_SwapChainExtent.height,
+		m_SwapChainInfo.SwapChainExtent.width,
+		m_SwapChainInfo.SwapChainExtent.height,
 		1,
-		m_MsaaSamples,
+		m_SwapChainInfo.MsaaSamples,
 		DepthFormat,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_DepthImage,
-		m_DepthImageMemory
+		m_SwapChainInfo.DepthImage,
+		m_SwapChainInfo.DepthImageMemory
 	);
 
 	CreateImageView(
 		m_Device,
-		m_DepthImage,
+		m_SwapChainInfo.DepthImage,
 		DepthFormat,
 		1,
 		VK_IMAGE_ASPECT_DEPTH_BIT,
-		m_DepthImageView
+		m_SwapChainInfo.DepthImageView
 	);
 
 	TransitionImageLayout(
 		m_Device,
 		m_GraphicsQueue,
 		m_CommandPool,
-		m_DepthImage,
+		m_SwapChainInfo.DepthImage,
 		DepthFormat,
 		1,
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -1303,15 +1261,15 @@ void App::RecreateDrawingCommandBuffer()
 
 /** Vulkan Init */void App::CreateFramebuffers()
 {
-	m_SwapChainFramebuffers.resize(m_SwapChainImageViews.size());
+	m_SwapChainInfo.SwapChainFramebuffers.resize(m_SwapChainInfo.BufferCount());
 
-	for (size_t i = 0; i < m_SwapChainImageViews.size(); i++)
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
 		std::array<VkImageView, 3> Attachments =
 		{
-			m_ColorImageView,
-			m_DepthImageView,
-			m_SwapChainImageViews[i]
+			m_SwapChainInfo.ColorImageView,
+			m_SwapChainInfo.DepthImageView,
+			m_SwapChainInfo.SwapChainImageViews[i]
 		};
 
 		VkFramebufferCreateInfo CreateInfo = {};
@@ -1319,175 +1277,63 @@ void App::RecreateDrawingCommandBuffer()
 		CreateInfo.renderPass = m_RenderPass;
 		CreateInfo.attachmentCount = static_cast<uint32_t>(Attachments.size());
 		CreateInfo.pAttachments = Attachments.data();
-		CreateInfo.width = m_SwapChainExtent.width;
-		CreateInfo.height = m_SwapChainExtent.height;
+		CreateInfo.width = m_SwapChainInfo.SwapChainExtent.width;
+		CreateInfo.height = m_SwapChainInfo.SwapChainExtent.height;
 		CreateInfo.layers = 1;
 
-		if (vkCreateFramebuffer(m_Device, &CreateInfo, nullptr, &m_SwapChainFramebuffers[i]) != VK_SUCCESS)
+		if (vkCreateFramebuffer(m_Device, &CreateInfo, nullptr, &m_SwapChainInfo.SwapChainFramebuffers[i]) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to create framebuffer!");
 		}
 	}
 }
 
-/** Vulkan Init */void App::LoadAndCreateTextureImage()
+/** Vulkan Init */void App::LoadAndCreateTextures()
 {
-	CreateTextureImageFromFile(
+	CreateTextureFromFile(
 		m_PhysicalDevice,
 		m_Device,
 		m_CommandPool,
 		m_GraphicsQueue,
 		m_AlbedoTexturePath.c_str(),
-		m_AlbedoMipLevels,
-		m_AlbedoTextureImage,
-		m_AlbedoTextureImageMemory
+		m_AlbedoTexture
 	);
 
-	CreateTextureImageFromFile(
+	CreateTextureFromFile(
 		m_PhysicalDevice,
 		m_Device,
 		m_CommandPool,
 		m_GraphicsQueue,
 		m_NormalTexturePath.c_str(),
-		m_NormalMipLevels,
-		m_NormalTextureImage,
-		m_NormalTextureImageMemory
+		m_NormalTexture
 	);
 
-	CreateTextureImageFromFile(
+	CreateTextureFromFile(
 		m_PhysicalDevice,
 		m_Device,
 		m_CommandPool,
 		m_GraphicsQueue,
 		m_MetallicTexturePath.c_str(),
-		m_MetallicMipLevels,
-		m_MetallicTextureImage,
-		m_MetallicTextureImageMemory
+		m_MetallicTexture
 	);
 
-	CreateTextureImageFromFile(
+	CreateTextureFromFile(
 		m_PhysicalDevice,
 		m_Device,
 		m_CommandPool,
 		m_GraphicsQueue,
 		m_RoughnessTexturePath.c_str(),
-		m_RoughnessMipLevels,
-		m_RoughnessTextureImage,
-		m_RoughnessTextureImageMemory
+		m_RoughnessTexture
 	);
 
-	CreateTextureImageFromFile(
+	CreateTextureFromFile(
 		m_PhysicalDevice,
 		m_Device,
 		m_CommandPool,
 		m_GraphicsQueue,
 		m_AoTexturePath.c_str(),
-		m_AoMipLevels,
-		m_AoTextureImage,
-		m_AoTextureImageMemory
+		m_AoTexture
 	);
-}
-
-/** Vulkan Init */void App::CreateTextureImageView()
-{
-	CreateImageView(
-		m_Device, 
-		m_AlbedoTextureImage, 
-		VK_FORMAT_R8G8B8A8_UNORM,
-		m_AlbedoMipLevels,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		m_AlbedoTextureImageView
-	);
-
-	CreateImageView(
-		m_Device,
-		m_NormalTextureImage,
-		VK_FORMAT_R8G8B8A8_UNORM,
-		m_NormalMipLevels,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		m_NormalTextureImageView
-	);
-
-	CreateImageView(
-		m_Device,
-		m_MetallicTextureImage,
-		VK_FORMAT_R8G8B8A8_UNORM,
-		m_MetallicMipLevels,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		m_MetallicTextureImageView
-	);
-
-	CreateImageView(
-		m_Device,
-		m_RoughnessTextureImage,
-		VK_FORMAT_R8G8B8A8_UNORM,
-		m_RoughnessMipLevels,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		m_RoughnessTextureImageView
-	);
-
-	CreateImageView(
-		m_Device,
-		m_AoTextureImage,
-		VK_FORMAT_R8G8B8A8_UNORM,
-		m_AoMipLevels,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		m_AoTextureImageView
-	);
-}
-
-/** Vulkan Init */void App::CreateTextureSampler()
-{
-	VkSamplerCreateInfo CreateInfo = {};
-	CreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	CreateInfo.magFilter = VK_FILTER_LINEAR;
-	CreateInfo.minFilter = VK_FILTER_LINEAR;
-	CreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	CreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	CreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	CreateInfo.anisotropyEnable = VK_TRUE;
-	CreateInfo.maxAnisotropy = 16;
-	CreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	CreateInfo.unnormalizedCoordinates = VK_FALSE;
-	CreateInfo.compareEnable = VK_FALSE;
-	CreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	CreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	CreateInfo.mipLodBias = 0.0f;
-	CreateInfo.minLod = 0.0f;
-	CreateInfo.maxLod = static_cast<float>(m_AlbedoMipLevels);
-
-	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_AlbedoTextureSampler) != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create texture sampler!");
-	}
-
-	CreateInfo.maxLod = static_cast<float>(m_NormalMipLevels);
-
-	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_NormalTextureSampler) != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create texture sampler!");
-	}
-
-	CreateInfo.maxLod = static_cast<float>(m_MetallicMipLevels);
-
-	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_MetallicTextureSampler) != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create texture sampler!");
-	}
-
-	CreateInfo.maxLod = static_cast<float>(m_RoughnessMipLevels);
-
-	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_RoughnessTextureSampler) != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create texture sampler!");
-	}
-
-	CreateInfo.maxLod = static_cast<float>(m_AoMipLevels);
-
-	if (vkCreateSampler(m_Device, &CreateInfo, nullptr, &m_AoTextureSampler) != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create texture sampler!");
-	}
 }
 
 void App::LoadObjModel()
@@ -1560,22 +1406,18 @@ void App::LoadObjModel()
 {
 	VkDeviceSize BufferSize = sizeof(m_Vertices[0]) * m_Vertices.size();
 
-	VkBuffer StagingBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory StagingBufferMemory = VK_NULL_HANDLE;
+	BufferInfo StagingBuffer;
+
 	CreateBuffer(
 		m_PhysicalDevice,
 		m_Device,
 		BufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		StagingBuffer,
-		StagingBufferMemory
+		StagingBuffer
 	);
 
-	void * pData = nullptr;
-	vkMapMemory(m_Device, StagingBufferMemory, 0, BufferSize, 0, &pData);
-	memcpy(pData, m_Vertices.data(), static_cast<size_t>(BufferSize));
-	vkUnmapMemory(m_Device, StagingBufferMemory);
+	MapMemory(m_Device, StagingBuffer.Memory, BufferSize, m_Vertices.data());
 
 	CreateBuffer(
 		m_PhysicalDevice,
@@ -1583,36 +1425,30 @@ void App::LoadObjModel()
 		BufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_VertexBuffer,
-		m_VertexBufferMemory
+		m_VertexBuffer
 	);
 
 	CopyBuffer(m_Device, m_CommandPool, m_GraphicsQueue, StagingBuffer, m_VertexBuffer, BufferSize);
 
-	vkDestroyBuffer(m_Device, StagingBuffer, nullptr);
-	vkFreeMemory(m_Device, StagingBufferMemory, nullptr);
+	DestroyBuffer(m_Device, StagingBuffer);
 }
 
 /** Vulkan Init */void App::CreateIndexBuffer()
 {
 	VkDeviceSize BufferSize = sizeof(m_Indices[0]) * m_Indices.size();
 
-	VkBuffer StagingBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory StagingBufferMemory = VK_NULL_HANDLE;
+	BufferInfo StagingBuffer;
+
 	CreateBuffer(
 		m_PhysicalDevice,
 		m_Device,
 		BufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		StagingBuffer,
-		StagingBufferMemory
+		StagingBuffer
 	);
 
-	void * pData = nullptr;
-	vkMapMemory(m_Device, StagingBufferMemory, 0, BufferSize, 0, &pData);
-	memcpy(pData, m_Indices.data(), static_cast<size_t>(BufferSize));
-	vkUnmapMemory(m_Device, StagingBufferMemory);
+	MapMemory(m_Device, StagingBuffer.Memory, BufferSize, m_Indices.data());
 
 	CreateBuffer(
 		m_PhysicalDevice,
@@ -1620,24 +1456,21 @@ void App::LoadObjModel()
 		BufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_IndexBuffer,
-		m_IndexBufferMemory
+		m_IndexBuffer
 	);
 
 	CopyBuffer(m_Device, m_CommandPool, m_GraphicsQueue, StagingBuffer, m_IndexBuffer, BufferSize);
 
-	vkDestroyBuffer(m_Device, StagingBuffer, nullptr);
-	vkFreeMemory(m_Device, StagingBufferMemory, nullptr);
+	DestroyBuffer(m_Device, StagingBuffer);
 }
 
 /** Vulkan Init */void App::CreateMvpUniformBuffer()
 {
 	VkDeviceSize BufferSize = sizeof(MvpUniformBufferObject);
 
-	m_MvpUniformBuffers.resize(m_SwapChainImages.size());
-	m_MvpUniformBufferMemories.resize(m_SwapChainImages.size());
+	m_MvpUniformBuffers.resize(m_SwapChainInfo.SwapChainImages.size());
 
-	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
 		CreateBuffer(
 			m_PhysicalDevice,
@@ -1645,8 +1478,7 @@ void App::LoadObjModel()
 			BufferSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			m_MvpUniformBuffers[i],
-			m_MvpUniformBufferMemories[i]
+			m_MvpUniformBuffers[i]
 		);
 	}
 }
@@ -1655,10 +1487,9 @@ void App::LoadObjModel()
 {
 	VkDeviceSize BufferSize = sizeof(LightUniformBufferObject);
 
-	m_LightUniformBuffers.resize(m_SwapChainImages.size());
-	m_LightUniformBufferMemories.resize(m_SwapChainImages.size());
+	m_LightUniformBuffers.resize(m_SwapChainInfo.BufferCount());
 
-	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
 		CreateBuffer(
 			m_PhysicalDevice,
@@ -1666,8 +1497,7 @@ void App::LoadObjModel()
 			BufferSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			m_LightUniformBuffers[i],
-			m_LightUniformBufferMemories[i]
+			m_LightUniformBuffers[i]
 		);
 	}
 }
@@ -1676,10 +1506,9 @@ void App::CreateMaterialUniformBuffer()
 {
 	VkDeviceSize BufferSize = sizeof(MaterialUniformBufferObject);
 
-	m_MaterialUniformBuffers.resize(m_SwapChainImages.size());
-	m_MaterialUniformBufferMemories.resize(m_SwapChainImages.size());
+	m_MaterialUniformBuffers.resize(m_SwapChainInfo.BufferCount());
 
-	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
 		CreateBuffer(
 			m_PhysicalDevice,
@@ -1687,8 +1516,7 @@ void App::CreateMaterialUniformBuffer()
 			BufferSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			m_MaterialUniformBuffers[i],
-			m_MaterialUniformBufferMemories[i]
+			m_MaterialUniformBuffers[i]
 		);
 	}
 }
@@ -1698,34 +1526,34 @@ void App::CreateMaterialUniformBuffer()
 	std::array<VkDescriptorPoolSize, 8> PoolSizes = {};
 	
 	PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	PoolSizes[0].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolSizes[0].descriptorCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 	
 	PoolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	PoolSizes[1].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolSizes[1].descriptorCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 
 	PoolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	PoolSizes[2].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolSizes[2].descriptorCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 
 	PoolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	PoolSizes[3].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolSizes[3].descriptorCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 
 	PoolSizes[4].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	PoolSizes[4].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolSizes[4].descriptorCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 
 	PoolSizes[5].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	PoolSizes[5].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolSizes[5].descriptorCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 
 	PoolSizes[6].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	PoolSizes[6].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolSizes[6].descriptorCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 
 	PoolSizes[7].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	PoolSizes[7].descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolSizes[7].descriptorCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 
 	VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 	PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	PoolCreateInfo.poolSizeCount = static_cast<uint32_t>(PoolSizes.size());
 	PoolCreateInfo.pPoolSizes = PoolSizes.data();
-	PoolCreateInfo.maxSets = static_cast<uint32_t>(m_SwapChainImages.size());
+	PoolCreateInfo.maxSets = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 
 	if (vkCreateDescriptorPool(m_Device, &PoolCreateInfo, nullptr, &m_DescriptorPool) != VK_SUCCESS)
 	{
@@ -1735,60 +1563,32 @@ void App::CreateMaterialUniformBuffer()
 
 /** Vulkan Init */void App::CreateDescriptorSets()
 {
-	std::vector<VkDescriptorSetLayout> Layouts(m_SwapChainImages.size(), m_DescriptorSetLayout);
+	std::vector<VkDescriptorSetLayout> Layouts(m_SwapChainInfo.BufferCount(), m_DescriptorSetLayout);
 	VkDescriptorSetAllocateInfo AllocInfo = {};
 	AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	AllocInfo.descriptorPool = m_DescriptorPool;
-	AllocInfo.descriptorSetCount = static_cast<uint32_t>(m_SwapChainImages.size());
+	AllocInfo.descriptorSetCount = static_cast<uint32_t>(m_SwapChainInfo.BufferCount());
 	AllocInfo.pSetLayouts = Layouts.data();
 
-	m_DescriptorSets.resize(m_SwapChainImages.size());
+	m_DescriptorSets.resize(m_SwapChainInfo.BufferCount());
 	if (vkAllocateDescriptorSets(m_Device, &AllocInfo, m_DescriptorSets.data()) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to allocate descriptor sets!");
 	}
 
-	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	for (size_t i = 0; i < m_SwapChainInfo.BufferCount(); i++)
 	{
-		VkDescriptorBufferInfo MvpBufferInfo = {};
-		MvpBufferInfo.buffer = m_MvpUniformBuffers[i];
-		MvpBufferInfo.offset = 0;
-		MvpBufferInfo.range = sizeof(MvpUniformBufferObject);
-
-		VkDescriptorBufferInfo LightBufferInfo = {};
-		LightBufferInfo.buffer = m_LightUniformBuffers[i];
-		LightBufferInfo.offset = 0;
-		LightBufferInfo.range = sizeof(LightUniformBufferObject);
-
-		VkDescriptorBufferInfo MaterialBufferInfo = {};
-		MaterialBufferInfo.buffer = m_MaterialUniformBuffers[i];
-		MaterialBufferInfo.offset = 0;
-		MaterialBufferInfo.range = sizeof(MaterialUniformBufferObject);
-
-		VkDescriptorImageInfo AlbedoImageInfo = {};
-		AlbedoImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		AlbedoImageInfo.imageView = m_AlbedoTextureImageView;
-		AlbedoImageInfo.sampler = m_AlbedoTextureSampler;
-
-		VkDescriptorImageInfo NormalImageInfo = {};
-		NormalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		NormalImageInfo.imageView = m_NormalTextureImageView;
-		NormalImageInfo.sampler = m_NormalTextureSampler;
-
-		VkDescriptorImageInfo MetallicImageInfo = {};
-		MetallicImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		MetallicImageInfo.imageView = m_MetallicTextureImageView;
-		MetallicImageInfo.sampler = m_MetallicTextureSampler;
-
-		VkDescriptorImageInfo RoughnessImageInfo = {};
-		RoughnessImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		RoughnessImageInfo.imageView = m_RoughnessTextureImageView;
-		RoughnessImageInfo.sampler = m_RoughnessTextureSampler;
-
-		VkDescriptorImageInfo AoImageInfo = {};
-		AoImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		AoImageInfo.imageView = m_AoTextureImageView;
-		AoImageInfo.sampler = m_AoTextureSampler;
+		VkDescriptorBufferInfo MvpBufferInfo = 
+			m_MvpUniformBuffers[i].GetDescriptorBufferInfo<MvpUniformBufferObject>();
+		VkDescriptorBufferInfo LightBufferInfo = 
+			m_LightUniformBuffers[i].GetDescriptorBufferInfo<LightUniformBufferObject>();
+		VkDescriptorBufferInfo MaterialBufferInfo = 
+			m_MaterialUniformBuffers[i].GetDescriptorBufferInfo<MaterialUniformBufferObject>();
+		VkDescriptorImageInfo AlbedoImageInfo = m_AlbedoTexture.GetDescriptorImageInfo();
+		VkDescriptorImageInfo NormalImageInfo = m_NormalTexture.GetDescriptorImageInfo();
+		VkDescriptorImageInfo MetallicImageInfo = m_MetallicTexture.GetDescriptorImageInfo();
+		VkDescriptorImageInfo RoughnessImageInfo = m_RoughnessTexture.GetDescriptorImageInfo();
+		VkDescriptorImageInfo AoImageInfo = m_AoTexture.GetDescriptorImageInfo();
 
 		std::array<VkWriteDescriptorSet, 8> DescriptorWrites = {};
 		
@@ -1884,7 +1684,7 @@ void App::CreateMaterialUniformBuffer()
 
 /** Vulkan Init */void App::CreateDrawingCommandBuffers()
 {
-	m_DrawingCommandBuffers.resize(m_SwapChainFramebuffers.size());
+	m_DrawingCommandBuffers.resize(m_SwapChainInfo.BufferCount());
 
 	VkCommandBufferAllocateInfo CmdBufferAllocInfo = {};
 	CmdBufferAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1912,9 +1712,9 @@ void App::CreateMaterialUniformBuffer()
 		VkRenderPassBeginInfo PassBeginInfo = {};
 		PassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		PassBeginInfo.renderPass = m_RenderPass;
-		PassBeginInfo.framebuffer = m_SwapChainFramebuffers[i];
+		PassBeginInfo.framebuffer = m_SwapChainInfo.SwapChainFramebuffers[i];
 		PassBeginInfo.renderArea.offset = { 0, 0 };
-		PassBeginInfo.renderArea.extent = m_SwapChainExtent;
+		PassBeginInfo.renderArea.extent = m_SwapChainInfo.SwapChainExtent;
 
 		std::array<VkClearValue, 2> ClearColors = {};
 		ClearColors[0].color = { 0.1f, 0.2f, 0.3f, 1.0f };
@@ -1931,10 +1731,10 @@ void App::CreateMaterialUniformBuffer()
 			m_GraphicsPipelines[m_GraphicsPipelineDisplayMode | m_GraphicsPipelineCullMode]
 		);
 
-		VkBuffer VertexBuffers[] = { m_VertexBuffer };
+		VkBuffer VertexBuffers[] = { m_VertexBuffer.Buffer };
 		VkDeviceSize Offsets[] = { 0 };
 		vkCmdBindVertexBuffers(m_DrawingCommandBuffers[i], 0, 1, VertexBuffers, Offsets);
-		vkCmdBindIndexBuffer(m_DrawingCommandBuffers[i], m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(m_DrawingCommandBuffers[i], m_IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 		vkCmdBindDescriptorSets(
 			m_DrawingCommandBuffers[i], 
 			VK_PIPELINE_BIND_POINT_GRAPHICS, 

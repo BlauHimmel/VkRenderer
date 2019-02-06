@@ -28,6 +28,60 @@ struct SwapChainSupportDetails
 	std::vector<VkPresentModeKHR> PresentModes;
 };
 
+struct SwapChainInfo
+{
+	VkSampleCountFlagBits MsaaSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	VkSwapchainKHR SwapChain = VK_NULL_HANDLE;
+
+	/** The images were created by the implementation for the swap chain and
+	* they will be automatically cleaned up once the swap chain has been destroyed.
+	*/
+	std::vector<VkImage> SwapChainImages;
+	std::vector<VkImageView> SwapChainImageViews;
+	VkFormat SwapChainImageFormat = VK_FORMAT_UNDEFINED;
+	VkExtent2D SwapChainExtent = { 0, 0 };
+
+	VkImage ColorImage = VK_NULL_HANDLE;
+	VkDeviceMemory ColorImageMemory = VK_NULL_HANDLE;
+	VkImageView ColorImageView = VK_NULL_HANDLE;
+
+	VkImage DepthImage = VK_NULL_HANDLE;
+	VkDeviceMemory DepthImageMemory = VK_NULL_HANDLE;
+	VkImageView DepthImageView = VK_NULL_HANDLE;
+
+	std::vector<VkFramebuffer> SwapChainFramebuffers;
+
+	size_t BufferCount() const;
+};
+
+struct BufferInfo
+{
+	VkBuffer Buffer = VK_NULL_HANDLE;
+	VkDeviceMemory Memory = VK_NULL_HANDLE;
+
+	template <typename TBuffer>
+	VkDescriptorBufferInfo GetDescriptorBufferInfo() const
+	{
+		VkDescriptorBufferInfo BufferInfo = {};
+		BufferInfo.buffer = Buffer;
+		BufferInfo.offset = 0;
+		BufferInfo.range = sizeof(TBuffer);
+		return BufferInfo;
+	}
+};
+
+struct TextureInfo
+{
+	uint32_t MipLevels = 0;
+	VkImage TextureImage = VK_NULL_HANDLE;
+	VkDeviceMemory TextureImageMemory = VK_NULL_HANDLE;
+	VkImageView TextureImageView = VK_NULL_HANDLE;
+	VkSampler TextureSampler = VK_NULL_HANDLE;
+
+	VkDescriptorImageInfo GetDescriptorImageInfo() const;
+};
+
 bool CheckValidationLayerSupport(
 	const std::vector<const char *> & Layers
 );
@@ -113,16 +167,15 @@ void CreateBuffer(
 	VkDeviceSize Size,
 	VkBufferUsageFlags Usage,
 	VkMemoryPropertyFlags Properties,
-	VkBuffer & Buffer,
-	VkDeviceMemory & BufferMemory
+	BufferInfo & Buffer
 );
 
 void CopyBuffer(
 	VkDevice Device,
 	VkCommandPool CommandPool,
 	VkQueue Queue,
-	VkBuffer SrcBuffer,
-	VkBuffer DstBuffer,
+	BufferInfo SrcBuffer,
+	BufferInfo DstBuffer,
 	VkDeviceSize Size
 );
 
@@ -199,6 +252,32 @@ void CreateTextureImageFromFile(
 	uint32_t & MipLevels,
 	VkImage & TextureImage,
 	VkDeviceMemory & TextureImageMemory
+);
+
+void CreateTextureFromFile(
+	VkPhysicalDevice PhysicalDevice,
+	VkDevice Device,
+	VkCommandPool CommandPool,
+	VkQueue Queue,
+	const char * pFilename,
+	TextureInfo & Texture
+);
+
+void DestroyTexture(
+	VkDevice Device,
+	TextureInfo & Texture
+);
+
+void DestroyBuffer(
+	VkDevice Device,
+	BufferInfo & Buffer
+);
+
+void MapMemory(
+	VkDevice Device,
+	VkDeviceMemory Memory,
+	VkDeviceSize Size,
+	void * pData
 );
 
 namespace ProxyVulkanFunction
