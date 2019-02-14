@@ -17,7 +17,7 @@ void Camera::Reset()
 	m_FarZ = 100.0f;
 
 	m_Resolution = glm::vec2(800.0f, 600.0f);;
-	m_Fov = glm::vec2(glm::radians(45.0f), glm::radians(45.0f));
+	SetFov(glm::radians(45.0f));
 }
 
 void Camera::UpdateYaw(float Delta)
